@@ -43,3 +43,12 @@ document.querySelector("#authForm").addEventListener("submit",event=>{event.prev
 document.querySelector("#profileClose").addEventListener("click",()=>profileModal.close());
 function openTipsterProfile(t){document.querySelector("#profileName").textContent=t.name;document.querySelector("#profileHandle").textContent=t.handle;document.querySelector("#profileInitial").textContent=t.initial;profileModal.showModal()}
 tipsterRoot.addEventListener("click",event=>{const card=event.target.closest(".tipster");if(!card)return;const name=card.querySelector("strong").textContent.replace("✓","").trim();const t=tipsters.find(item=>item.name===name);if(t)openTipsterProfile(t)});
+
+const dashboard=document.querySelector("#tipsterDashboard");
+document.querySelector("#tipsterOpen").addEventListener("click",()=>dashboard.showModal());
+document.querySelector("#dashboardClose").addEventListener("click",()=>dashboard.close());
+const slipImageInput=document.querySelector("#slipImage");
+const slipImagePreview=document.querySelector("#slipImagePreview");
+let slipImageObjectUrl=null;
+slipImageInput.addEventListener("change",()=>{const file=slipImageInput.files&&slipImageInput.files[0];if(slipImageObjectUrl){URL.revokeObjectURL(slipImageObjectUrl);slipImageObjectUrl=null}slipImagePreview.replaceChildren();if(!file){slipImagePreview.textContent="Your selected betslip image preview will appear here.";return}if(!file.type.startsWith("image/")){slipImagePreview.textContent="Please choose an image file.";slipImageInput.value="";return}slipImageObjectUrl=URL.createObjectURL(file);const img=document.createElement("img");img.src=slipImageObjectUrl;img.alt="Selected betslip preview";slipImagePreview.appendChild(img)});
+document.querySelector("#slipUploadForm").addEventListener("submit",event=>{event.preventDefault();const form=event.currentTarget;if(!form.reportValidity())return;const expiry=new Date(document.querySelector("#slipExpiry").value);if(Number.isNaN(expiry.getTime())||expiry<=new Date()){showToast("Choose a future expiry time.");return}showToast("Slip draft prepared for preview only — not uploaded.");form.reset();if(slipImageObjectUrl){URL.revokeObjectURL(slipImageObjectUrl);slipImageObjectUrl=null}slipImagePreview.textContent="Your selected betslip image preview will appear here."});
