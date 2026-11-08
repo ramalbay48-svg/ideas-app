@@ -89,11 +89,10 @@
   async function reviewTipster(id, decision) {
     error("");
     try {
-      const {data,error:e} = await client.rpc("review_tipster_application", {
+      const {error:e} = await client.rpc("admin_review_tipster", {
         p_tipster_id:id, p_decision:decision, p_reason:null
       });
       if (e) throw e;
-      if (!data?.success) throw new Error("The database did not confirm the decision.");
       await loadApplications();
       await loadAuditLogs();
     } catch (e) { error("Could not update application: " + (e.message || "Unknown error")); }
