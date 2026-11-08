@@ -72,3 +72,22 @@ document.querySelector("#checkoutForm").addEventListener("submit",event=>{
  document.querySelector("#unlockPreview").hidden=false;
  showToast("Demo checkout only — no payment was made.");
 });
+
+const adminDashboard=document.querySelector("#adminDashboard");
+document.querySelector("#adminOpen").addEventListener("click",()=>adminDashboard.showModal());
+document.querySelector("#adminClose").addEventListener("click",()=>adminDashboard.close());
+document.querySelectorAll("[data-admin-tab]").forEach(button=>button.addEventListener("click",()=>{
+ document.querySelectorAll("[data-admin-tab]").forEach(b=>b.classList.toggle("active",b===button));
+ document.querySelectorAll(".admin-panel").forEach(panel=>panel.classList.toggle("active",panel.id==="admin-"+button.dataset.adminTab));
+}));
+function renderAdminTipsters(){document.querySelector("#adminTipsterList").innerHTML=tipsters.map(t=>`<div class="admin-tipster-row"><div><strong>${t.name}</strong><small>${t.handle}</small></div><span class="status-pill">Demo entry</span></div>`).join("");}
+renderAdminTipsters();
+document.querySelector("#adminTipsterForm").addEventListener("submit",event=>{
+ event.preventDefault();const name=document.querySelector("#newTipsterName").value.trim();let handle=document.querySelector("#newTipsterHandle").value.trim().toLowerCase();const phone=document.querySelector("#newTipsterPhone");
+ if(!phone.checkValidity()){phone.reportValidity();return}if(!handle.startsWith("@"))handle="@"+handle;if(!name||handle.length<3){showToast("Enter a name and valid username.");return}
+ if(tipsters.some(t=>t.handle.toLowerCase()===handle)){showToast("That username is already used.");return}
+ tipsters.push({name,handle,initial:name.charAt(0).toUpperCase(),verified:false});renderTipsters();renderAdminTipsters();event.target.reset();showToast("Tipster added to this demo only.");
+});
+document.querySelectorAll("[data-review]").forEach(button=>button.addEventListener("click",()=>{document.querySelector("#resultReviewStatus").textContent="Demo review marked: "+button.dataset.review+". No public stats were changed.";}));
+document.querySelector("#savePriceLimits").addEventListener("click",()=>{const min=Number(document.querySelector("#minimumPrice").value),max=Number(document.querySelector("#maximumPrice").value);if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min){showToast("Enter a valid minimum and maximum price.");return}document.querySelector("#priceLimitStatus").textContent="Demo limits saved: TZS "+min.toLocaleString("en-US")+"–"+max.toLocaleString("en-US")+".";showToast("Price limits saved in this demo view.");});
+document.querySelector("#publishAnnouncement").addEventListener("click",()=>{const message=document.querySelector("#announcementText").value.trim();document.querySelector("#announcementPreview").textContent=message||"Enter an announcement first.";if(message)showToast("Announcement preview created; it was not sent.");});
