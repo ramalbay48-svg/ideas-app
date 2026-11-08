@@ -38,9 +38,11 @@
     if (profile.role === "admin") {
       $("roleNotice").textContent = "Administrator access: review tipster applications. Decisions are checked and recorded by the database.";
       $("adminPanel").classList.remove("hidden");
+      $("resultsPanel").classList.remove("hidden");
       $("auditPanel").classList.remove("hidden");
       $("applyPanel").classList.add("hidden");
       await loadApplications();
+      await loadResultSubmissions();
       await loadAuditLogs();
     } else if (profile.role === "tipster") {
       $("roleNotice").textContent = "Tipster access: create and manage your marketplace listings.";
@@ -98,6 +100,34 @@
     } catch (e) { error("Could not update application: " + (e.message || "Unknown error")); }
   }
 
+  async function loadResultSubmissions() {
+    $("resultList").textContent = "Loading result submissions…";
+    const {data,error:e} = await client.from("result_submissions")
+      .select("id,slip_id,submitted_by,submitted_result,note,status,created_at,review_reason,betslips(betting_company,total_odds,tipsters(username))")
+      .order("created_at",{ascending:false}).limit(50);
+    if (e) throw e;
+    if (!data?.length) { $("resultList").textContent = "No result submissions yet."; return; }
+    $("resultList").innerHTML = data.map(r => {
+      const slip = r.betslips || {};
+      const tipsterName = slip.tipsters?.username ? "@" + slip.tipsters.username : "Tipster";
+      return '<article class="record"><div class="record-head"><div><strong>' + esc(tipsterName) + ' · ' + esc(slip.betting_company || "Betting slip") + '</strong><small>Submitted ' + esc(new Date(r.created_at).toLocaleString()) + '</small></div><span class="tag">' + esc(r.status) + '</span></div><p class="muted">Claimed result: <strong>' + esc(r.submitted_result) + '</strong>' + (slip.total_odds ? ' · Odds ' + esc(slip.total_odds) : '') + '</p>' + (r.note ? '<p class="muted">' + esc(r.note) + '</p>' : '') + (r.review_reason ? '<p class="muted">Review note: ' + esc(r.review_reason) + '</p>' : '') + (r.status === "pending" ? '<div class="record-actions"><button class="approve" data-result-approve="' + r.id + '">Confirm result</button><button class="reject" data-result-reject="' + r.id + '">Reject result</button></div>' : '') + '</article>';
+    }).join("");
+    $("resultList").querySelectorAll("[data-result-approve]").forEach(b => b.addEventListener("click", () => reviewResult(b.dataset.resultApprove,"approved")));
+    $("resultList").querySelectorAll("[data-result-reject]").forEach(b => b.addEventListener("click", () => reviewResult(b.dataset.resultReject,"rejected")));
+  }
+
+  async function reviewResult(id, decision) {
+    error("");
+    try {
+      const {error:e} = await client.rpc("admin_review_result_submission", {
+        p_result_submission_id:id, p_decision:decision, p_reason:null
+      });
+      if (e) throw e;
+      await loadResultSubmissions();
+      await loadAuditLogs();
+    } catch (e) { error("Could not review result: " + (e.message || "Unknown error")); }
+  }
+
   async function loadAuditLogs() {
     $("auditList").textContent = "Loading recent admin activity…";
     const {data,error:e} = await client.from("admin_audit_logs")
@@ -143,7 +173,7 @@
   $("logoutButton").addEventListener("click", async () => {
     await client.auth.signOut(); user = null; profile = null; tipster = null;
     $("workspace").classList.add("hidden"); $("loginPanel").classList.remove("hidden");
-    $("adminPanel").classList.add("hidden"); $("auditPanel").classList.add("hidden"); $("tipsterPanel").classList.add("hidden"); $("applyPanel").classList.add("hidden");
+    $("adminPanel").classList.add("hidden"); $("resultsPanel").classList.add("hidden"); $("auditPanel").classList.add("hidden"); $("tipsterPanel").classList.add("hidden"); $("applyPanel").classList.add("hidden");
     $("loginForm").reset(); $("workspaceError").textContent = "";
   });
 
