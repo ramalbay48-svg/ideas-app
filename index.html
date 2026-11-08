@@ -22,6 +22,7 @@
       <p class="eyebrow">WELCOME TO IDEAS APP</p>
       <h1>Find your next <span class="green">insight.</span></h1>
       <p class="muted">Discover tipsters and explore their latest selections.</p>
+      <p class="backend-status" id="backendStatus" role="status" aria-live="polite">Checking database connection…</p>
     </section>
 
     <section class="banner" aria-label="Featured announcement">
@@ -155,6 +156,7 @@
     <p class="demo-warning">Admin actions are not saved to a database, do not create real tipster accounts, and do not approve real results. Before launch, this area must be protected with server-verified admin permissions and audit logs.</p>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>
