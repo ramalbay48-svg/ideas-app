@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0D0D0D">
+  <meta name="description" content="IDEAS APP — premium tipster marketplace prototype">
+  <title>IDEAS APP Marketplace</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="IDEAS APP home"><span class="brand-mark">I</span><span>IDEAS<span class="green"> APP</span></span></a>
+    <div class="top-actions">
+      <button class="icon-button" id="themeToggle" aria-label="Switch colour theme" title="Switch theme">☼</button>
+      <button class="avatar" aria-label="Account">U</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="welcome">
+      <p class="eyebrow">WELCOME TO IDEAS APP</p>
+      <h1>Find your next <span class="green">insight.</span></h1>
+      <p class="muted">Discover tipsters and explore their latest selections.</p>
+    </section>
+
+    <section class="banner" aria-label="Featured announcement">
+      <div>
+        <span class="banner-tag">FEATURED</span>
+        <h2>Better insights.<br>One marketplace.</h2>
+        <p>Explore tipster profiles and available slips.</p>
+      </div>
+      <div class="banner-symbol" aria-hidden="true">I</div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <div><p class="eyebrow">DISCOVER</p><h2>Featured tipsters</h2></div>
+        <button class="text-button" data-view="tipsters">See all</button>
+      </div>
+      <div class="tipster-row" id="tipsters"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <div><p class="eyebrow">MARKETPLACE</p><h2>Available betslips</h2></div>
+        <span class="demo-label">DEMO PREVIEW</span>
+      </div>
+      <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Search tipster name or username" autocomplete="off"></label>
+      <div class="filters" role="group" aria-label="Filter by betting company">
+        <button class="filter active" data-company="All">All</button>
+        <button class="filter" data-company="SportPesa">SportPesa</button>
+        <button class="filter" data-company="Betika">Betika</button>
+        <button class="filter" data-company="BetPawa">BetPawa</button>
+        <button class="filter" data-company="Other">Other</button>
+      </div>
+      <div class="slip-list" id="slips"></div>
+    </section>
+
+    <section class="notice">
+      <strong>Responsible betting</strong>
+      <p>For adults of legal betting age only. Betting involves risk. Never stake money you cannot afford to lose.</p>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button class="nav-item selected" data-view="home"><span>⌂</span>Home</button>
+    <button class="nav-item" data-view="tipsters"><span>♙</span>Tipsters</button>
+    <button class="nav-item" data-view="betslips"><span>▤</span>My slips</button>
+    <button class="nav-item" data-view="profile"><span>◉</span>Profile</button>
+  </nav>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
