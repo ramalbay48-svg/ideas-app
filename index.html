@@ -13,7 +13,7 @@
     <a class="brand" href="#" aria-label="IDEAS APP home"><span class="brand-mark">I</span><span>IDEAS<span class="green"> APP</span></span></a>
     <div class="top-actions">
       <button class="icon-button" id="themeToggle" aria-label="Switch colour theme" title="Switch theme">☼</button>
-      <button class="login-open" id="loginOpen">Log in</button>
+      <button class="tipster-open" id="tipsterOpen">Tipster</button><button class="login-open" id="loginOpen">Log in</button>
     </div>
   </header>
 
@@ -90,6 +90,29 @@
     <p class="profile-bio">This is a sample tipster profile. Verified seller status and performance figures will be shown here after they are connected to the secure app database and reviewed by the admin.</p>
     <div class="profile-stats"><div><strong>—</strong><small>Win rate</small></div><div><strong>—</strong><small>Winning slips</small></div><div><strong>—</strong><small>Followers</small></div></div>
     <p class="demo-warning">Sample profile only. No real tipster verification or performance data is connected yet.</p>
+  </dialog>
+
+  <dialog class="modal dashboard-modal" id="tipsterDashboard">
+    <div class="modal-head"><div><p class="eyebrow">TIPSTER WORKSPACE</p><h2>Tipster dashboard</h2></div><button class="close-button" id="dashboardClose" aria-label="Close">×</button></div>
+    <div class="dashboard-stats"><div><strong>—</strong><small>Published slips</small></div><div><strong>—</strong><small>Win rate</small></div><div><strong>—</strong><small>Sales (TZS)</small></div></div>
+    <div class="dashboard-intro"><strong>Publish a betslip</strong><p>Prepare one slip at a time. Your image stays covered in the marketplace until a payment is verified by the secure backend.</p></div>
+    <form id="slipUploadForm">
+      <label class="field-label" for="slipOdds">Total odds</label>
+      <input class="form-input" id="slipOdds" name="odds" type="number" min="1.01" step="0.01" placeholder="e.g. 8.50" required>
+      <label class="field-label" for="slipPrice">Selling price (TZS)</label>
+      <input class="form-input" id="slipPrice" name="price" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 2500" required>
+      <label class="field-label" for="slipCompany">Betting company</label>
+      <select class="form-input" id="slipCompany" name="company" required>
+        <option value="">Choose company</option><option>SportPesa</option><option>Betika</option><option>Meridianbet</option><option>BetPawa</option><option>Other</option>
+      </select>
+      <label class="field-label" for="slipExpiry">Validity / expiry time</label>
+      <input class="form-input" id="slipExpiry" name="expiry" type="datetime-local" required>
+      <label class="field-label" for="slipImage">Betslip picture</label>
+      <input class="file-input" id="slipImage" name="image" type="file" accept="image/*" required>
+      <div class="image-preview" id="slipImagePreview">Your selected betslip image preview will appear here.</div>
+      <button class="primary-action" type="submit">Prepare slip draft</button>
+    </form>
+    <p class="demo-warning">Demo only: this does not upload or publish a real slip. The image is previewed on this device only. Tipster approval, server storage, price limits and publishing controls must be connected before launch.</p>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
