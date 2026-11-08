@@ -85,6 +85,18 @@
           <button class="primary">Publish listing</button>
         </form>
         <p class="hint" id="slipStatus"></p>
+        <div class="subheading">Report a betting result</div>
+        <p class="muted">After a listing has finished, report whether it won or lost. The result stays pending until an administrator reviews it.</p>
+        <form id="resultSubmitForm" class="hidden">
+          <label for="resultSlip">Your listing</label>
+          <select id="resultSlip" required></select>
+          <label for="submittedResult">Result</label>
+          <select id="submittedResult" required><option value="won">Won</option><option value="lost">Lost</option></select>
+          <label for="resultNote">Note (optional)</label>
+          <textarea id="resultNote" maxlength="500" rows="2" placeholder="Add a short note or evidence description"></textarea>
+          <button class="primary">Submit result for review</button>
+        </form>
+        <p class="hint" id="resultSubmitStatus"></p>
         <div class="subheading">Your listings</div>
         <div id="mySlips" class="records">Loading your listings…</div>
       </section>
