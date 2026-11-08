@@ -8,7 +8,7 @@ const slips=[
   {id:2,name:"Golden Picks",handle:"@goldenpicks",initial:"G",company:"Betika",odds:"5.20",price:3000,expires:"5h 10m"},
   {id:3,name:"Smart Analyst",handle:"@smartanalyst",initial:"S",company:"BetPawa",odds:"12.00",price:2000,expires:"Tomorrow"}
 ];
-let activeCompany="All";
+let activeCompany="All";\nlet selectedCheckoutSlip=null;
 const tipsterRoot=document.querySelector("#tipsters");
 const slipRoot=document.querySelector("#slips");
 const search=document.querySelector("#searchInput");
@@ -25,7 +25,7 @@ function renderSlips(){
   <div class="locked-preview"><span class="lock">▣</span> BETSLIP HIDDEN UNTIL PAYMENT</div>
   <div class="slip-footer"><div class="price">TZS ${s.price.toLocaleString("en-US")}<small>One-time purchase · demo price</small></div><button class="buy-button" data-buy="${s.id}">Buy slip</button></div>
  </article>`).join("");
- slipRoot.querySelectorAll("[data-buy]").forEach(button=>button.addEventListener("click",()=>showToast("Demo only — payments are not connected yet.")));
+ slipRoot.querySelectorAll("[data-buy]").forEach(button=>button.addEventListener("click",()=>openCheckout(Number(button.dataset.buy))));
 }
 document.querySelectorAll(".filter").forEach(button=>button.addEventListener("click",()=>{document.querySelectorAll(".filter").forEach(b=>b.classList.remove("active"));button.classList.add("active");activeCompany=button.dataset.company;renderSlips()}));
 search.addEventListener("input",renderSlips);
@@ -52,3 +52,23 @@ const slipImagePreview=document.querySelector("#slipImagePreview");
 let slipImageObjectUrl=null;
 slipImageInput.addEventListener("change",()=>{const file=slipImageInput.files&&slipImageInput.files[0];if(slipImageObjectUrl){URL.revokeObjectURL(slipImageObjectUrl);slipImageObjectUrl=null}slipImagePreview.replaceChildren();if(!file){slipImagePreview.textContent="Your selected betslip image preview will appear here.";return}if(!file.type.startsWith("image/")){slipImagePreview.textContent="Please choose an image file.";slipImageInput.value="";return}slipImageObjectUrl=URL.createObjectURL(file);const img=document.createElement("img");img.src=slipImageObjectUrl;img.alt="Selected betslip preview";slipImagePreview.appendChild(img)});
 document.querySelector("#slipUploadForm").addEventListener("submit",event=>{event.preventDefault();const form=event.currentTarget;if(!form.reportValidity())return;const expiry=new Date(document.querySelector("#slipExpiry").value);if(Number.isNaN(expiry.getTime())||expiry<=new Date()){showToast("Choose a future expiry time.");return}showToast("Slip draft prepared for preview only — not uploaded.");form.reset();if(slipImageObjectUrl){URL.revokeObjectURL(slipImageObjectUrl);slipImageObjectUrl=null}slipImagePreview.textContent="Your selected betslip image preview will appear here."});
+
+const checkoutModal=document.querySelector("#checkoutModal");
+function openCheckout(id){
+ selectedCheckoutSlip=slips.find(s=>s.id===id);
+ if(!selectedCheckoutSlip)return;
+ document.querySelector("#checkoutSummary").innerHTML=`<strong>${selectedCheckoutSlip.name}</strong><small>${selectedCheckoutSlip.company} · Total odds ${selectedCheckoutSlip.odds} · Slip remains covered</small>`;
+ document.querySelector("#checkoutTotal").textContent="TZS "+selectedCheckoutSlip.price.toLocaleString("en-US");
+ document.querySelector("#unlockPreview").hidden=true;
+ checkoutModal.showModal();
+}
+document.querySelector("#checkoutClose").addEventListener("click",()=>checkoutModal.close());
+document.querySelector("#checkoutForm").addEventListener("submit",event=>{
+ event.preventDefault();
+ const form=event.currentTarget;
+ if(!form.reportValidity())return;
+ const phone=document.querySelector("#paymentPhone");
+ if(!phone.checkValidity()){phone.reportValidity();return}
+ document.querySelector("#unlockPreview").hidden=false;
+ showToast("Demo checkout only — no payment was made.");
+});
