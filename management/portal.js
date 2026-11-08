@@ -163,10 +163,38 @@
     finally { button.disabled = false; }
   });
 
+  $("resultSubmitForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("resultSubmitStatus").textContent = "";
+    const button = e.submitter; button.disabled = true;
+    try {
+      if (!tipster) await loadTipster();
+      const slipId = $("resultSlip").value;
+      if (!slipId) throw new Error("Choose one of your published listings.");
+      const {error:e2} = await client.from("result_submissions").insert({
+        slip_id:slipId,
+        submitted_by:user.id,
+        submitted_result:$("submittedResult").value,
+        note:$("resultNote").value.trim(),
+        status:"pending"
+      });
+      if (e2) throw e2;
+      $("resultSubmitStatus").textContent = "Result submitted. It is waiting for administrator review.";
+      $("resultNote").value = "";
+    } catch (e2) { $("resultSubmitStatus").textContent = e2.message || "Could not submit result."; }
+    finally { button.disabled = false; }
+  });
+
   async function loadMySlips() {
     const {data,error:e} = await client.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,status,created_at").eq("tipster_id",tipster.id).order("created_at",{ascending:false});
     if (e) throw e;
-    if (!data?.length) { $("mySlips").textContent = "You have not published any listings yet."; return; }
+    if (!data?.length) {
+      $("mySlips").textContent = "You have not published any listings yet.";
+      $("resultSubmitForm").classList.add("hidden");
+      return;
+    }
+    $("resultSubmitForm").classList.remove("hidden");
+    $("resultSlip").innerHTML = data.map(s => '<option value="' + esc(s.id) + '">' + esc(s.betting_company) + ' · Odds ' + esc(s.total_odds) + ' · ' + esc(new Date(s.created_at).toLocaleDateString()) + '</option>').join("");
     $("mySlips").innerHTML = data.map(s => '<article class="record"><div class="record-head"><strong>'+esc(s.betting_company)+' · Odds '+esc(s.total_odds)+'</strong><span class="tag">'+esc(s.status)+'</span></div><small>'+esc(new Date(s.expires_at).toLocaleString())+' · TZS '+Number(s.price_tzs).toLocaleString("en-US")+'</small></article>').join("");
   }
 
