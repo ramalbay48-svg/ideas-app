@@ -1,117 +1,255 @@
-// Supabase public client configuration. The publishable key is intended for browser use.
+// IDEAS APP — connected marketplace frontend (Supabase)
 const IDEAS_SUPABASE_URL = "https://hclgguciyhdqaqsvuddp.supabase.co";
 const IDEAS_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_6WzBBcoIz8YABVp2KlHh8A_vSOOKbJU";
-let ideasSupabaseClient = null;
-const backendStatus = document.querySelector("#backendStatus");
-try {
-  if (window.supabase && window.supabase.createClient) {
-    ideasSupabaseClient = window.supabase.createClient(IDEAS_SUPABASE_URL, IDEAS_SUPABASE_PUBLISHABLE_KEY);
-    ideasSupabaseClient.from("announcements").select("id").limit(1).then(({ error }) => {
-      if (backendStatus) backendStatus.textContent = error ? "Backend connection needs attention." : "Database connection: connected";
-      if (error) console.error("IDEAS APP backend check:", error.message);
-    }).catch(error => {
-      if (backendStatus) backendStatus.textContent = "Backend connection needs attention.";
-      console.error("IDEAS APP backend check:", error);
-    });
-  } else if (backendStatus) {
-    backendStatus.textContent = "Backend library did not load. Check your internet connection.";
+const $ = (selector) => document.querySelector(selector);
+const backendStatus = $("#backendStatus");
+let db = null;
+let currentUser = null;
+let currentProfile = null;
+let activeCompany = "All";
+let selectedSlip = null;
+let otpPendingPhone = null;
+
+function toast(message) {
+  const node = $("#toast");
+  if (!node) return;
+  node.textContent = message;
+  node.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => node.classList.remove("show"), 3000);
+}
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+function money(value) {
+  return "TZS " + Number(value || 0).toLocaleString("en-US");
+}
+function showPage(page) {
+  const homeSections = [".welcome", ".banner", ".section", ".notice"];
+  homeSections.forEach(selector => document.querySelectorAll(selector).forEach(el => el.hidden = page !== "home"));
+  let panel = $("#appPagePanel");
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "appPagePanel";
+    panel.className = "section";
+    $(".page").insertBefore(panel, $(".notice"));
   }
-} catch (error) {
-  if (backendStatus) backendStatus.textContent = "Backend connection needs attention.";
-  console.error("IDEAS APP Supabase setup:", error);
+  panel.hidden = page === "home";
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("selected", b.dataset.view === page));
+  if (page === "tipsters") loadTipstersPage(panel);
+  if (page === "betslips") loadPurchasesPage(panel);
+  if (page === "profile") loadProfilePage(panel);
+  window.scrollTo({top:0, behavior:"smooth"});
 }
-
-const tipsters=[
-  {name:"Alpha Tips",handle:"@alphatips",initial:"A",verified:true},
-  {name:"Golden Picks",handle:"@goldenpicks",initial:"G",verified:true},
-  {name:"Smart Analyst",handle:"@smartanalyst",initial:"S",verified:true}
-];
-const slips=[
-  {id:1,name:"Alpha Tips",handle:"@alphatips",initial:"A",company:"SportPesa",odds:"8.50",price:2500,expires:"2h 30m"},
-  {id:2,name:"Golden Picks",handle:"@goldenpicks",initial:"G",company:"Betika",odds:"5.20",price:3000,expires:"5h 10m"},
-  {id:3,name:"Smart Analyst",handle:"@smartanalyst",initial:"S",company:"BetPawa",odds:"12.00",price:2000,expires:"Tomorrow"}
-];
-let activeCompany="All";
-let selectedCheckoutSlip=null;
-const tipsterRoot=document.querySelector("#tipsters");
-const slipRoot=document.querySelector("#slips");
-const search=document.querySelector("#searchInput");
-const toast=document.querySelector("#toast");
-function showToast(message){toast.textContent=message;toast.classList.add("show");clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.classList.remove("show"),2300)}
-function renderTipsters(){tipsterRoot.innerHTML=tipsters.map(t=>`<article class="tipster"><div class="tipster-avatar">${t.initial}</div><strong>${t.name} <span class="verified">✓</span></strong><small>${t.handle}</small></article>`).join("")}
-function renderSlips(){
- const term=search.value.trim().toLowerCase();
- const shown=slips.filter(s=>(activeCompany==="All"||s.company===activeCompany||activeCompany==="Other"&&!["SportPesa","Betika","BetPawa"].includes(s.company))&&(s.name.toLowerCase().includes(term)||s.handle.toLowerCase().includes(term)));
- if(!shown.length){slipRoot.innerHTML='<div class="empty">No demo slips match your search.</div>';return}
- slipRoot.innerHTML=shown.map(s=>`<article class="slip-card">
-  <div class="slip-top"><div class="seller"><div class="seller-avatar">${s.initial}</div><div><strong>${s.name} <span class="verified">✓</span></strong><small>${s.handle}</small></div></div><span class="company">${s.company}</span></div>
-  <div class="slip-stats"><div class="stat"><small>Total odds</small><strong>${s.odds}</strong></div><div class="stat"><small>Validity</small><strong>${s.expires}</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div>
-  <div class="locked-preview"><span class="lock">▣</span> BETSLIP HIDDEN UNTIL PAYMENT</div>
-  <div class="slip-footer"><div class="price">TZS ${s.price.toLocaleString("en-US")}<small>One-time purchase · demo price</small></div><button class="buy-button" data-buy="${s.id}">Buy slip</button></div>
- </article>`).join("");
- slipRoot.querySelectorAll("[data-buy]").forEach(button=>button.addEventListener("click",()=>openCheckout(Number(button.dataset.buy))));
-}
-document.querySelectorAll(".filter").forEach(button=>button.addEventListener("click",()=>{document.querySelectorAll(".filter").forEach(b=>b.classList.remove("active"));button.classList.add("active");activeCompany=button.dataset.company;renderSlips()}));
-search.addEventListener("input",renderSlips);
-document.querySelector("#themeToggle").addEventListener("click",()=>{document.documentElement.classList.toggle("light");document.querySelector('meta[name="theme-color"]').content=document.documentElement.classList.contains("light")?"#f5f7f5":"#0D0D0D"});
-document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>showToast(button.dataset.view==="home"?"You are on Home.":`${button.dataset.view[0].toUpperCase()+button.dataset.view.slice(1)} will be added in the next build stage.`)));
-renderTipsters();renderSlips();
-const authModal=document.querySelector("#authModal");
-const profileModal=document.querySelector("#profileModal");
-let authMode="register";
-function setAuthMode(mode){authMode=mode;document.querySelectorAll(".auth-tab").forEach(b=>b.classList.toggle("active",b.dataset.auth===mode));document.querySelector("#authTitle").textContent=mode==="register"?"Create account":"Welcome back";document.querySelector("#authSubmit").textContent=mode==="register"?"Create account":"Log in";document.querySelector("#passwordInput").autocomplete=mode==="register"?"new-password":"current-password";document.querySelector("#passwordInput").placeholder=mode==="register"?"At least 8 characters":"Enter your password";document.querySelector("#authHelp").textContent="Use your Tanzanian mobile number. Enter the 9 digits after +255."}
-document.querySelector("#loginOpen").addEventListener("click",()=>{setAuthMode("login");authModal.showModal()});
-document.querySelector("#authClose").addEventListener("click",()=>authModal.close());
-document.querySelectorAll(".auth-tab").forEach(b=>b.addEventListener("click",()=>setAuthMode(b.dataset.auth)));
-document.querySelector("#authForm").addEventListener("submit",event=>{event.preventDefault();const phone=document.querySelector("#phoneInput");const password=document.querySelector("#passwordInput");if(!phone.checkValidity()){phone.reportValidity();return}if(password.value.length<8){password.setCustomValidity("Use at least 8 characters.");password.reportValidity();password.setCustomValidity("");return}showToast("Demo only — secure account services are not connected.");authModal.close();event.target.reset()});
-document.querySelector("#profileClose").addEventListener("click",()=>profileModal.close());
-function openTipsterProfile(t){document.querySelector("#profileName").textContent=t.name;document.querySelector("#profileHandle").textContent=t.handle;document.querySelector("#profileInitial").textContent=t.initial;profileModal.showModal()}
-tipsterRoot.addEventListener("click",event=>{const card=event.target.closest(".tipster");if(!card)return;const name=card.querySelector("strong").textContent.replace("✓","").trim();const t=tipsters.find(item=>item.name===name);if(t)openTipsterProfile(t)});
-
-const dashboard=document.querySelector("#tipsterDashboard");
-document.querySelector("#tipsterOpen").addEventListener("click",()=>dashboard.showModal());
-document.querySelector("#dashboardClose").addEventListener("click",()=>dashboard.close());
-const slipImageInput=document.querySelector("#slipImage");
-const slipImagePreview=document.querySelector("#slipImagePreview");
-let slipImageObjectUrl=null;
-slipImageInput.addEventListener("change",()=>{const file=slipImageInput.files&&slipImageInput.files[0];if(slipImageObjectUrl){URL.revokeObjectURL(slipImageObjectUrl);slipImageObjectUrl=null}slipImagePreview.replaceChildren();if(!file){slipImagePreview.textContent="Your selected betslip image preview will appear here.";return}if(!file.type.startsWith("image/")){slipImagePreview.textContent="Please choose an image file.";slipImageInput.value="";return}slipImageObjectUrl=URL.createObjectURL(file);const img=document.createElement("img");img.src=slipImageObjectUrl;img.alt="Selected betslip preview";slipImagePreview.appendChild(img)});
-document.querySelector("#slipUploadForm").addEventListener("submit",event=>{event.preventDefault();const form=event.currentTarget;if(!form.reportValidity())return;const expiry=new Date(document.querySelector("#slipExpiry").value);if(Number.isNaN(expiry.getTime())||expiry<=new Date()){showToast("Choose a future expiry time.");return}showToast("Slip draft prepared for preview only — not uploaded.");form.reset();if(slipImageObjectUrl){URL.revokeObjectURL(slipImageObjectUrl);slipImageObjectUrl=null}slipImagePreview.textContent="Your selected betslip image preview will appear here."});
-
-const checkoutModal=document.querySelector("#checkoutModal");
-function openCheckout(id){
- selectedCheckoutSlip=slips.find(s=>s.id===id);
- if(!selectedCheckoutSlip)return;
- document.querySelector("#checkoutSummary").innerHTML=`<strong>${selectedCheckoutSlip.name}</strong><small>${selectedCheckoutSlip.company} · Total odds ${selectedCheckoutSlip.odds} · Slip remains covered</small>`;
- document.querySelector("#checkoutTotal").textContent="TZS "+selectedCheckoutSlip.price.toLocaleString("en-US");
- document.querySelector("#unlockPreview").hidden=true;
- checkoutModal.showModal();
-}
-document.querySelector("#checkoutClose").addEventListener("click",()=>checkoutModal.close());
-document.querySelector("#checkoutForm").addEventListener("submit",event=>{
- event.preventDefault();
- const form=event.currentTarget;
- if(!form.reportValidity())return;
- const phone=document.querySelector("#paymentPhone");
- if(!phone.checkValidity()){phone.reportValidity();return}
- document.querySelector("#unlockPreview").hidden=false;
- showToast("Demo checkout only — no payment was made.");
-});
-
-const adminDashboard=document.querySelector("#adminDashboard");
-document.querySelector("#adminOpen").addEventListener("click",()=>adminDashboard.showModal());
-document.querySelector("#adminClose").addEventListener("click",()=>adminDashboard.close());
-document.querySelectorAll("[data-admin-tab]").forEach(button=>button.addEventListener("click",()=>{
- document.querySelectorAll("[data-admin-tab]").forEach(b=>b.classList.toggle("active",b===button));
- document.querySelectorAll(".admin-panel").forEach(panel=>panel.classList.toggle("active",panel.id==="admin-"+button.dataset.adminTab));
+document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => showPage(button.dataset.view)));
+document.querySelectorAll(".filter").forEach(button => button.addEventListener("click", () => {
+  document.querySelectorAll(".filter").forEach(b => b.classList.toggle("active", b === button));
+  activeCompany = button.dataset.company;
+  loadMarketplace();
 }));
-function renderAdminTipsters(){document.querySelector("#adminTipsterList").innerHTML=tipsters.map(t=>`<div class="admin-tipster-row"><div><strong>${t.name}</strong><small>${t.handle}</small></div><span class="status-pill">Demo entry</span></div>`).join("");}
-renderAdminTipsters();
-document.querySelector("#adminTipsterForm").addEventListener("submit",event=>{
- event.preventDefault();const name=document.querySelector("#newTipsterName").value.trim();let handle=document.querySelector("#newTipsterHandle").value.trim().toLowerCase();const phone=document.querySelector("#newTipsterPhone");
- if(!phone.checkValidity()){phone.reportValidity();return}if(!handle.startsWith("@"))handle="@"+handle;if(!name||handle.length<3){showToast("Enter a name and valid username.");return}
- if(tipsters.some(t=>t.handle.toLowerCase()===handle)){showToast("That username is already used.");return}
- tipsters.push({name,handle,initial:name.charAt(0).toUpperCase(),verified:false});renderTipsters();renderAdminTipsters();event.target.reset();showToast("Tipster added to this demo only.");
+$("#themeToggle").addEventListener("click", () => {
+  document.documentElement.classList.toggle("light");
+  $('meta[name="theme-color"]').content = document.documentElement.classList.contains("light") ? "#f5f7f5" : "#0D0D0D";
 });
-document.querySelectorAll("[data-review]").forEach(button=>button.addEventListener("click",()=>{document.querySelector("#resultReviewStatus").textContent="Demo review marked: "+button.dataset.review+". No public stats were changed.";}));
-document.querySelector("#savePriceLimits").addEventListener("click",()=>{const min=Number(document.querySelector("#minimumPrice").value),max=Number(document.querySelector("#maximumPrice").value);if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min){showToast("Enter a valid minimum and maximum price.");return}document.querySelector("#priceLimitStatus").textContent="Demo limits saved: TZS "+min.toLocaleString("en-US")+"–"+max.toLocaleString("en-US")+".";showToast("Price limits saved in this demo view.");});
-document.querySelector("#publishAnnouncement").addEventListener("click",()=>{const message=document.querySelector("#announcementText").value.trim();document.querySelector("#announcementPreview").textContent=message||"Enter an announcement first.";if(message)showToast("Announcement preview created; it was not sent.");});
+$("#searchInput").addEventListener("input", loadMarketplace);
+
+function showAuth(mode = "login") {
+  setAuthMode(mode);
+  $("#authModal").showModal();
+}
+$("#loginOpen").addEventListener("click", () => showAuth("login"));
+$("#authClose").addEventListener("click", () => $("#authModal").close());
+document.querySelectorAll(".auth-tab").forEach(b => b.addEventListener("click", () => setAuthMode(b.dataset.auth)));
+function setAuthMode(mode) {
+  const isRegister = mode === "register";
+  document.querySelectorAll(".auth-tab").forEach(b => b.classList.toggle("active", b.dataset.auth === mode));
+  $("#authTitle").textContent = isRegister ? "Create account" : "Welcome back";
+  $("#authSubmit").textContent = isRegister ? "Send verification code" : "Log in";
+  $("#passwordInput").autocomplete = isRegister ? "new-password" : "current-password";
+  $("#passwordInput").placeholder = isRegister ? "At least 8 characters" : "Enter your password";
+  $("#authHelp").textContent = isRegister ? "A verification code will be sent by SMS. SMS delivery must be enabled for this Supabase project." : "Enter your Tanzanian number and password.";
+  $("#otpField")?.remove();
+  $("#verifyOtpButton")?.remove();
+  otpPendingPhone = null;
+  $("#authForm").dataset.mode = mode;
+}
+function ensureOtpField() {
+  if ($("#otpField")) return;
+  const label = document.createElement("label");
+  label.id = "otpField";
+  label.className = "field-label";
+  label.textContent = "SMS verification code";
+  const input = document.createElement("input");
+  input.id = "otpInput";
+  input.className = "form-input";
+  input.inputMode = "numeric";
+  input.autocomplete = "one-time-code";
+  input.maxLength = 6;
+  input.placeholder = "Enter the 6-digit code";
+  input.required = true;
+  label.appendChild(input);
+  $("#authForm").appendChild(label);
+  const verify = document.createElement("button");
+  verify.type = "button";
+  verify.id = "verifyOtpButton";
+  verify.className = "primary-action";
+  verify.textContent = "Verify code and finish registration";
+  verify.addEventListener("click", verifyPhoneOtp);
+  $("#authForm").appendChild(verify);
+}
+$("#authForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!db) return toast("Database is not connected yet.");
+  const raw = $("#phoneInput").value.replace(/\D/g, "");
+  const phone = "+255" + raw;
+  const password = $("#passwordInput").value;
+  if (!/^[67]\d{8}$/.test(raw)) return toast("Enter a valid 9-digit Tanzanian mobile number.");
+  if (password.length < 8) return toast("Password must contain at least 8 characters.");
+  const mode = event.currentTarget.dataset.mode;
+  $("#authSubmit").disabled = true;
+  try {
+    if (mode === "register") {
+      const {data, error} = await db.auth.signUp({phone, password, options:{data:{display_name:""}}});
+      if (error) throw error;
+      if (data.session) {
+        await afterLogin(data.user);
+        $("#authModal").close();
+        return toast("Account created successfully.");
+      }
+      otpPendingPhone = phone;
+      ensureOtpField();
+      toast("Verification code requested. Check your SMS.");
+    } else {
+      const {data, error} = await db.auth.signInWithPassword({phone, password});
+      if (error) throw error;
+      await afterLogin(data.user);
+      $("#authModal").close();
+      toast("You are logged in.");
+    }
+  } catch (error) {
+    toast(error.message || "Authentication failed.");
+  } finally {
+    $("#authSubmit").disabled = false;
+  }
+});
+async function verifyPhoneOtp() {
+  if (!db || !otpPendingPhone) return;
+  const token = $("#otpInput").value.trim();
+  if (!/^\d{6}$/.test(token)) return toast("Enter the 6-digit verification code.");
+  try {
+    const {data, error} = await db.auth.verifyOtp({phone:otpPendingPhone, token, type:"sms"});
+    if (error) throw error;
+    await afterLogin(data.user);
+    $("#authModal").close();
+    toast("Phone verified. Account created.");
+  } catch (error) {
+    toast(error.message || "Could not verify that code.");
+  }
+}
+async function afterLogin(user) {
+  currentUser = user;
+  const {data, error} = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  if (error) console.warn("Profile lookup:", error.message);
+  currentProfile = data || null;
+  updateAccountControls();
+}
+function updateAccountControls() {
+  $("#loginOpen").textContent = currentUser ? "Log out" : "Log in";
+  $("#loginOpen").onclick = currentUser ? async () => {
+    await db.auth.signOut();
+    currentUser = null; currentProfile = null;
+    updateAccountControls();
+    toast("Logged out.");
+    showPage("home");
+  } : () => showAuth("login");
+  $("#tipsterOpen").hidden = !currentProfile || !["tipster","admin"].includes(currentProfile.role);
+  $("#adminOpen").hidden = !currentProfile || currentProfile.role !== "admin";
+}
+
+async function loadTipstersPage(panel) {
+  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><p class="muted">Loading tipsters…</p>';
+  if (!db) return;
+  const {data, error} = await db.from("tipsters").select("id,username,bio,profiles(display_name)").eq("status","approved").order("created_at",{ascending:false});
+  if (error) { panel.innerHTML = '<h2>Tipsters</h2><p class="muted">Could not load tipsters. Check database permissions.</p>'; return; }
+  if (!data?.length) { panel.innerHTML = '<h2>Approved tipsters</h2><div class="empty">No approved tipsters yet. Check back soon.</div>'; return; }
+  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + data.map(t => '<article class="tipster"><div class="tipster-avatar">'+escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase())+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p></article>').join("") + '</div>';
+}
+async function loadMarketplace() {
+  const root = $("#slips");
+  if (!root || !db) return;
+  root.innerHTML = '<div class="empty">Loading available slips…</div>';
+  let query = db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,tipsters(id,username,profiles(display_name))").eq("status","published").gt("expires_at",new Date().toISOString()).order("created_at",{ascending:false});
+  if (activeCompany !== "All" && activeCompany !== "Other") query = query.eq("betting_company",activeCompany);
+  const {data,error} = await query;
+  if (error) { root.innerHTML = '<div class="empty">Marketplace could not load. Please try again later.</div>'; console.warn(error.message); return; }
+  const term = $("#searchInput").value.trim().toLowerCase();
+  const rows = (data||[]).filter(s => {
+    const name = s.tipsters?.profiles?.display_name || s.tipsters?.username || "";
+    const company = s.betting_company || "";
+    return (activeCompany !== "Other" || !["SportPesa","Betika","BetPawa"].includes(company)) && (name.toLowerCase().includes(term) || (s.tipsters?.username||"").toLowerCase().includes(term));
+  });
+  if (!rows.length) { root.innerHTML = '<div class="empty">No published slips are available right now.</div>'; return; }
+  root.innerHTML = rows.map(s => {
+    const name = s.tipsters?.profiles?.display_name || s.tipsters?.username || "Tipster";
+    const username = s.tipsters?.username || "";
+    return '<article class="slip-card"><div class="slip-top"><div class="seller"><div class="seller-avatar">'+escapeHtml(name.charAt(0).toUpperCase())+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></div><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
+  }).join("");
+  root.querySelectorAll("[data-buy]").forEach(b => b.addEventListener("click", () => {
+    if (!currentUser) return showAuth("login");
+    toast("Secure checkout is not enabled yet. No payment has been taken.");
+  }));
+}
+async function loadPurchasesPage(panel) {
+  if (!currentUser) { panel.innerHTML = '<h2>My slips</h2><p class="muted">Log in to see your purchases.</p><button class="primary-action" id="pageLogin">Log in</button>'; $("#pageLogin").onclick=()=>showAuth("login"); return; }
+  panel.innerHTML = '<h2>My slips</h2><p class="muted">Loading your purchases…</p>';
+  const {data,error} = await db.from("purchases").select("id,status,amount_tzs,created_at,betslips(total_odds,betting_company,expires_at,tipsters(username))").eq("customer_id",currentUser.id).order("created_at",{ascending:false});
+  if (error) { panel.innerHTML='<h2>My slips</h2><p class="muted">Could not load purchases.</p>'; return; }
+  if (!data?.length) { panel.innerHTML='<h2>My slips</h2><div class="empty">You have not purchased any slips yet.</div>'; return; }
+  panel.innerHTML='<h2>My slips</h2>'+data.map(p=>'<article class="slip-card"><strong>'+escapeHtml(p.betslips?.betting_company||"Betslip")+'</strong><p class="muted">'+escapeHtml(p.betslips?.tipsters?.username||"Tipster")+' · Odds '+escapeHtml(p.betslips?.total_odds||"—")+'</p><p>'+money(p.amount_tzs)+' · '+escapeHtml(p.status)+'</p>'+(p.status==="paid"?'<p class="muted">Payment confirmed. Secure image access will appear when private storage is configured.</p>':'<p class="muted">Waiting for verified payment.</p>')+'</article>').join("");
+}
+async function loadProfilePage(panel) {
+  if (!currentUser) { panel.innerHTML='<h2>Your profile</h2><p class="muted">Log in or create an account to manage your profile.</p><button class="primary-action" id="profileLogin">Log in / Register</button>'; $("#profileLogin").onclick=()=>showAuth("register"); return; }
+  const p=currentProfile || {};
+  panel.innerHTML='<p class="eyebrow">ACCOUNT</p><h2>Your profile</h2><div class="slip-card"><strong>'+escapeHtml(p.display_name||"IDEAS APP member")+'</strong><p class="muted">'+escapeHtml(currentUser.phone||"")+'</p><p class="muted">Account type: '+escapeHtml(p.role||"customer")+'</p></div><button class="primary-action" id="logoutButton">Log out</button>';
+  $("#logoutButton").onclick=async()=>{await db.auth.signOut();currentUser=null;currentProfile=null;updateAccountControls();showPage("home");toast("Logged out.");};
+}
+$("#tipsterOpen").addEventListener("click", () => {
+  if (!currentUser || !["tipster","admin"].includes(currentProfile?.role)) return toast("A tipster account is required.");
+  $("#tipsterDashboard").showModal();
+});
+$("#adminOpen").addEventListener("click", () => {
+  if (currentProfile?.role !== "admin") return toast("Admin access required.");
+  $("#adminDashboard").showModal();
+});
+$("#dashboardClose").addEventListener("click",()=>$("#tipsterDashboard").close());
+$("#adminClose").addEventListener("click",()=>$("#adminDashboard").close());
+$("#profileClose").addEventListener("click",()=>$("#profileModal").close());
+$("#authModal").addEventListener("click", event => { if(event.target === $("#authModal")) $("#authModal").close(); });
+
+async function initialize() {
+  $("#tipsterOpen").hidden = true;
+  $("#adminOpen").hidden = true;
+  if (!window.supabase?.createClient) {
+    if (backendStatus) backendStatus.textContent = "Could not load Supabase library. Check your connection.";
+    return;
+  }
+  db = window.supabase.createClient(IDEAS_SUPABASE_URL, IDEAS_SUPABASE_PUBLISHABLE_KEY);
+  try {
+    const {error} = await db.from("announcements").select("id").limit(1);
+    if (backendStatus) backendStatus.textContent = error ? "Database connection needs attention." : "Database connection: connected";
+    if (error) console.warn("Supabase check:",error.message);
+  } catch(error) {
+    if (backendStatus) backendStatus.textContent = "Database connection needs attention.";
+  }
+  const {data:{session}} = await db.auth.getSession();
+  if (session?.user) await afterLogin(session.user);
+  db.auth.onAuthStateChange(async (_event, sessionNow) => {
+    if (sessionNow?.user) { currentUser=sessionNow.user; setTimeout(()=>afterLogin(sessionNow.user),0); }
+    else { currentUser=null; currentProfile=null; updateAccountControls(); }
+  });
+  await loadMarketplace();
+  const {data:news} = await db.from("announcements").select("title,message").eq("active",true).limit(1).maybeSingle();
+  if (news && $(".banner p")) $(".banner p").textContent = news.message;
+  updateAccountControls();
+}
+initialize();
