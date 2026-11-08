@@ -22,3 +22,10 @@ The next engineering stage is to add a real backend (Firebase Auth, Firestore, a
 - Demo slips and prices are illustrative, not real betting advice.
 - No real payments are enabled.
 - Do not deploy as a production betting/payment service until legal requirements, age restrictions, provider approval, security rules, and end-to-end tests have been completed.
+
+
+## Backend foundation
+
+A starter database migration is in `supabase/schema.sql`. It is intended for a **new, dedicated IDEAS APP Supabase project**, not the separate JM SHOP project. It defines profiles, approved tipsters, slips, private slip-asset records, purchases, payment transactions, result reviews, announcements, audit logs and settings with row-level security.
+
+This is a foundation only. It does not connect the frontend, create credentials, configure private Storage policies, implement a payment gateway, or make the current demo login/admin screens secure. Do not publish real customer or payment data until those pieces are completed and tested.
