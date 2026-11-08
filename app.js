@@ -57,7 +57,6 @@ function showAuth(mode = "login") {
   setAuthMode(mode);
   $("#authModal").showModal();
 }
-$("#loginOpen").addEventListener("click", () => showAuth("login"));
 $("#authClose").addEventListener("click", () => $("#authModal").close());
 document.querySelectorAll(".auth-tab").forEach(b => b.addEventListener("click", () => setAuthMode(b.dataset.auth)));
 function setAuthMode(mode) {
