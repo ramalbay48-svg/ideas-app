@@ -13,7 +13,7 @@
     <a class="brand" href="#" aria-label="IDEAS APP home"><span class="brand-mark">I</span><span>IDEAS<span class="green"> APP</span></span></a>
     <div class="top-actions">
       <button class="icon-button" id="themeToggle" aria-label="Switch colour theme" title="Switch theme">☼</button>
-      <button class="tipster-open" id="tipsterOpen">Tipster</button><button class="login-open" id="loginOpen">Log in</button>
+      <button class="tipster-open" id="tipsterOpen">Tipster</button><button class="admin-open" id="adminOpen">Admin</button><button class="login-open" id="loginOpen">Log in</button>
     </div>
   </header>
 
@@ -130,6 +130,29 @@
     </form>
     <p class="demo-warning">Demo only: no payment request will be sent and no money will be charged. A slip must only unlock after the payment provider confirms success through a secure server.</p>
     <div class="unlock-preview" id="unlockPreview" hidden><strong>Slip still locked</strong><p>Payment has not been verified. The full betslip image remains hidden.</p></div>
+  </dialog>
+
+  <dialog class="modal admin-modal" id="adminDashboard">
+    <div class="modal-head"><div><p class="eyebrow">OWNER CONTROL CENTRE</p><h2>Admin dashboard</h2></div><button class="close-button" id="adminClose" aria-label="Close">×</button></div>
+    <p class="admin-demo-note">Prototype admin screen. It is not protected by real admin login yet. Changes below are temporary and stay only in this browser session.</p>
+    <div class="admin-overview"><div><strong>—</strong><small>Total sales</small></div><div><strong>—</strong><small>Slips sold</small></div><div><strong>—</strong><small>Pending checks</small></div></div>
+    <div class="admin-tabs"><button class="admin-tab active" data-admin-tab="tipsters">Tipsters</button><button class="admin-tab" data-admin-tab="results">Results</button><button class="admin-tab" data-admin-tab="prices">Prices</button><button class="admin-tab" data-admin-tab="announcements">News</button></div>
+    <section class="admin-panel active" id="admin-tipsters"><h3>Manage tipsters</h3>
+      <form id="adminTipsterForm"><label class="field-label" for="newTipsterName">Tipster display name</label><input class="form-input" id="newTipsterName" required maxlength="40" placeholder="Tipster name">
+      <label class="field-label" for="newTipsterHandle">Unique username</label><input class="form-input" id="newTipsterHandle" required maxlength="24" placeholder="@username">
+      <label class="field-label" for="newTipsterPhone">Phone number</label><input class="form-input" id="newTipsterPhone" required inputmode="numeric" pattern="[67][0-9]{8}" maxlength="9" placeholder="7XX XXX XXX">
+      <button class="primary-action" type="submit">Add tipster (demo)</button></form><div class="admin-list" id="adminTipsterList"></div>
+    </section>
+    <section class="admin-panel" id="admin-results"><h3>Review tipster results</h3><p class="muted admin-small">Review submitted outcomes before they count toward public performance.</p>
+      <div class="review-card"><div><strong>Sample pending result</strong><small>Alpha Tips · Demo slip #001</small></div><div class="review-actions"><button class="approve-button" data-review="approved">Approve</button><button class="reject-button" data-review="rejected">Reject</button></div></div><p class="admin-small" id="resultReviewStatus">No real results are connected.</p>
+    </section>
+    <section class="admin-panel" id="admin-prices"><h3>Price limits</h3><p class="muted admin-small">Set the allowed TZS price range for future slip uploads.</p>
+      <label class="field-label" for="minimumPrice">Minimum price (TZS)</label><input class="form-input" id="minimumPrice" type="number" min="1" value="1000">
+      <label class="field-label" for="maximumPrice">Maximum price (TZS)</label><input class="form-input" id="maximumPrice" type="number" min="1" value="100000">
+      <button class="primary-action" id="savePriceLimits" type="button">Save price limits (demo)</button><p class="admin-small" id="priceLimitStatus">Default demo range: TZS 1,000–100,000.</p>
+    </section>
+    <section class="admin-panel" id="admin-announcements"><h3>Announcements</h3><label class="field-label" for="announcementText">Message for app users</label><textarea class="form-input admin-textarea" id="announcementText" maxlength="240" placeholder="Write an announcement..."></textarea><button class="primary-action" id="publishAnnouncement" type="button">Preview announcement</button><div class="announcement-preview" id="announcementPreview">No announcement preview yet.</div></section>
+    <p class="demo-warning">Admin actions are not saved to a database, do not create real tipster accounts, and do not approve real results. Before launch, this area must be protected with server-verified admin permissions and audit logs.</p>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
