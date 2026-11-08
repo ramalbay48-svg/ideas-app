@@ -29,3 +29,8 @@ The next engineering stage is to add a real backend (Firebase Auth, Firestore, a
 A starter database migration is in `supabase/schema.sql`. It is intended for a **new, dedicated IDEAS APP Supabase project**, not the separate JM SHOP project. It defines profiles, approved tipsters, slips, private slip-asset records, purchases, payment transactions, result reviews, announcements, audit logs and settings with row-level security.
 
 This is a foundation only. It does not connect the frontend, create credentials, configure private Storage policies, implement a payment gateway, or make the current demo login/admin screens secure. Do not publish real customer or payment data until those pieces are completed and tested.
+
+
+## Supabase browser connection (initial)
+
+The frontend now loads Supabase JS v2 and initializes a browser client with the IDEAS APP project URL and its publishable key. It performs a small read-only connection check against the announcements table and displays a connection status. This does **not** enable real customer authentication, tipster uploads, purchases, payment processing, or slip unlocking. Those require the agreed authentication design and secure server-side functions. The publishable key is public by design; never add a Supabase secret key or service-role key to browser files.
