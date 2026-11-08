@@ -114,6 +114,23 @@
     </form>
     <p class="demo-warning">Demo only: this does not upload or publish a real slip. The image is previewed on this device only. Tipster approval, server storage, price limits and publishing controls must be connected before launch.</p>
   </dialog>
+
+  <dialog class="modal checkout-modal" id="checkoutModal">
+    <div class="modal-head"><div><p class="eyebrow">SECURE CHECKOUT PREVIEW</p><h2>Buy this betslip</h2></div><button class="close-button" id="checkoutClose" aria-label="Close">×</button></div>
+    <div class="checkout-summary" id="checkoutSummary"></div>
+    <form id="checkoutForm">
+      <label class="field-label" for="paymentMethod">Mobile money provider</label>
+      <select class="form-input" id="paymentMethod" required>
+        <option value="">Choose payment method</option><option>M-Pesa</option><option>Tigo Pesa</option><option>Airtel Money</option><option>HaloPesa</option>
+      </select>
+      <label class="field-label" for="paymentPhone">Mobile money number</label>
+      <div class="phone-field"><span>+255</span><input id="paymentPhone" type="tel" inputmode="numeric" pattern="[67][0-9]{8}" maxlength="9" placeholder="7XX XXX XXX" required></div>
+      <div class="checkout-total"><span>Total to pay</span><strong id="checkoutTotal">TZS —</strong></div>
+      <button class="primary-action" type="submit">Continue to payment preview</button>
+    </form>
+    <p class="demo-warning">Demo only: no payment request will be sent and no money will be charged. A slip must only unlock after the payment provider confirms success through a secure server.</p>
+    <div class="unlock-preview" id="unlockPreview" hidden><strong>Slip still locked</strong><p>Payment has not been verified. The full betslip image remains hidden.</p></div>
+  </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
 </body>
