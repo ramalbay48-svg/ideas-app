@@ -38,6 +38,7 @@
     if (profile.role === "admin") {
       $("roleNotice").textContent = "Administrator access: review tipster applications. Decisions are checked and recorded by the database.";
       $("adminPanel").classList.remove("hidden");
+      $("auditPanel").classList.remove("hidden");
       $("applyPanel").classList.add("hidden");
       await loadApplications();
       await loadAuditLogs();
@@ -143,7 +144,7 @@
   $("logoutButton").addEventListener("click", async () => {
     await client.auth.signOut(); user = null; profile = null; tipster = null;
     $("workspace").classList.add("hidden"); $("loginPanel").classList.remove("hidden");
-    $("adminPanel").classList.add("hidden"); $("tipsterPanel").classList.add("hidden"); $("applyPanel").classList.add("hidden");
+    $("adminPanel").classList.add("hidden"); $("auditPanel").classList.add("hidden"); $("tipsterPanel").classList.add("hidden"); $("applyPanel").classList.add("hidden");
     $("loginForm").reset(); $("workspaceError").textContent = "";
   });
 
