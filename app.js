@@ -32,3 +32,14 @@ search.addEventListener("input",renderSlips);
 document.querySelector("#themeToggle").addEventListener("click",()=>{document.documentElement.classList.toggle("light");document.querySelector('meta[name="theme-color"]').content=document.documentElement.classList.contains("light")?"#f5f7f5":"#0D0D0D"});
 document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>showToast(button.dataset.view==="home"?"You are on Home.":`${button.dataset.view[0].toUpperCase()+button.dataset.view.slice(1)} will be added in the next build stage.`)));
 renderTipsters();renderSlips();
+const authModal=document.querySelector("#authModal");
+const profileModal=document.querySelector("#profileModal");
+let authMode="register";
+function setAuthMode(mode){authMode=mode;document.querySelectorAll(".auth-tab").forEach(b=>b.classList.toggle("active",b.dataset.auth===mode));document.querySelector("#authTitle").textContent=mode==="register"?"Create account":"Welcome back";document.querySelector("#authSubmit").textContent=mode==="register"?"Create account":"Log in";document.querySelector("#passwordInput").autocomplete=mode==="register"?"new-password":"current-password";document.querySelector("#passwordInput").placeholder=mode==="register"?"At least 8 characters":"Enter your password";document.querySelector("#authHelp").textContent="Use your Tanzanian mobile number. Enter the 9 digits after +255."}
+document.querySelector("#loginOpen").addEventListener("click",()=>{setAuthMode("login");authModal.showModal()});
+document.querySelector("#authClose").addEventListener("click",()=>authModal.close());
+document.querySelectorAll(".auth-tab").forEach(b=>b.addEventListener("click",()=>setAuthMode(b.dataset.auth)));
+document.querySelector("#authForm").addEventListener("submit",event=>{event.preventDefault();const phone=document.querySelector("#phoneInput");const password=document.querySelector("#passwordInput");if(!phone.checkValidity()){phone.reportValidity();return}if(password.value.length<8){password.setCustomValidity("Use at least 8 characters.");password.reportValidity();password.setCustomValidity("");return}showToast("Demo only — secure account services are not connected.");authModal.close();event.target.reset()});
+document.querySelector("#profileClose").addEventListener("click",()=>profileModal.close());
+function openTipsterProfile(t){document.querySelector("#profileName").textContent=t.name;document.querySelector("#profileHandle").textContent=t.handle;document.querySelector("#profileInitial").textContent=t.initial;profileModal.showModal()}
+tipsterRoot.addEventListener("click",event=>{const card=event.target.closest(".tipster");if(!card)return;const name=card.querySelector("strong").textContent.replace("✓","").trim();const t=tipsters.find(item=>item.name===name);if(t)openTipsterProfile(t)});
