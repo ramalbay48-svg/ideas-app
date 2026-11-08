@@ -13,7 +13,7 @@
     <a class="brand" href="#" aria-label="IDEAS APP home"><span class="brand-mark">I</span><span>IDEAS<span class="green"> APP</span></span></a>
     <div class="top-actions">
       <button class="icon-button" id="themeToggle" aria-label="Switch colour theme" title="Switch theme">☼</button>
-      <button class="avatar" aria-label="Account">U</button>
+      <button class="login-open" id="loginOpen">Log in</button>
     </div>
   </header>
 
@@ -69,6 +69,28 @@
     <button class="nav-item" data-view="betslips"><span>▤</span>My slips</button>
     <button class="nav-item" data-view="profile"><span>◉</span>Profile</button>
   </nav>
+
+  <dialog class="modal" id="authModal">
+    <div class="modal-head"><div><p class="eyebrow">YOUR IDEAS APP ACCOUNT</p><h2 id="authTitle">Create account</h2></div><button class="close-button" id="authClose" aria-label="Close">×</button></div>
+    <div class="auth-tabs"><button class="auth-tab active" data-auth="register">Register</button><button class="auth-tab" data-auth="login">Log in</button></div>
+    <form id="authForm">
+      <label class="field-label" for="phoneInput">Tanzanian phone number</label>
+      <div class="phone-field"><span>+255</span><input id="phoneInput" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="7XX XXX XXX" pattern="[67][0-9]{8}" maxlength="9" required></div>
+      <label class="field-label" for="passwordInput">Password</label>
+      <input class="form-input" id="passwordInput" name="password" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters" required>
+      <p class="form-help" id="authHelp">Use your Tanzanian mobile number. Enter the 9 digits after +255.</p>
+      <button class="primary-action" type="submit" id="authSubmit">Create account</button>
+    </form>
+    <p class="demo-warning">Prototype only: this form does not create or authenticate a real account yet. Your details are not sent or saved.</p>
+  </dialog>
+  <dialog class="modal" id="profileModal">
+    <div class="modal-head"><div><p class="eyebrow">TIPSTER PROFILE</p><h2 id="profileName">Tipster</h2></div><button class="close-button" id="profileClose" aria-label="Close">×</button></div>
+    <div class="profile-cover"><div class="profile-avatar" id="profileInitial">A</div></div>
+    <p class="muted" id="profileHandle">@tipster</p>
+    <p class="profile-bio">This is a sample tipster profile. Verified seller status and performance figures will be shown here after they are connected to the secure app database and reviewed by the admin.</p>
+    <div class="profile-stats"><div><strong>—</strong><small>Win rate</small></div><div><strong>—</strong><small>Winning slips</small></div><div><strong>—</strong><small>Followers</small></div></div>
+    <p class="demo-warning">Sample profile only. No real tipster verification or performance data is connected yet.</p>
+  </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
 </body>
