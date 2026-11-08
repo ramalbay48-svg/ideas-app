@@ -140,7 +140,35 @@ async function loadTipstersPage(panel) {
   const {data, error} = await db.from("tipsters").select("id,username,bio,profiles(display_name)").eq("status","approved").order("created_at",{ascending:false});
   if (error) { panel.innerHTML = '<h2>Tipsters</h2><p class="muted">Could not load tipsters. Check database permissions.</p>'; return; }
   if (!data?.length) { panel.innerHTML = '<h2>Approved tipsters</h2><div class="empty">No approved tipsters yet. Check back soon.</div>'; return; }
-  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + data.map(t => '<article class="tipster"><div class="tipster-avatar">'+escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase())+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p></article>').join("") + '</div>';
+  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + data.map(t => '<article class="tipster" role="button" tabindex="0" data-tipster="' + escapeHtml(t.id) + '" aria-label="Open tipster @' + escapeHtml(t.username) + '"><div class="tipster-avatar">'+escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase())+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p><small class="muted">Tap to view profile and available slips →</small></article>').join("") + '</div>';
+  panel.querySelectorAll("[data-tipster]").forEach(card => {
+    const open = () => loadTipsterDetail(panel, data.find(t => t.id === card.dataset.tipster));
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
+  });
+}
+async function loadTipsterDetail(panel, tipster) {
+  if (!tipster) return;
+  const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
+  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
+  $("#backToTipsters").addEventListener("click", () => loadTipstersPage(panel));
+  const {data, error} = await db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at").eq("tipster_id", tipster.id).eq("status", "published").gt("expires_at", new Date().toISOString()).order("created_at", {ascending:false});
+  if (error) {
+    panel.innerHTML += '<div class="empty">Could not load this tipster’s slips right now.</div>';
+    console.warn("Tipster slips:", error.message);
+    return;
+  }
+  const heading = '<h3>Published betting slips</h3>';
+  if (!data?.length) {
+    panel.innerHTML = panel.innerHTML.replace('<h3>Published betting slips</h3><p class="muted">Loading available slips…</p>', heading + '<div class="empty">This tipster has no active published slips right now.</div>');
+    return;
+  }
+  const cards = data.map(s => '<article class="slip-card"><div class="slip-top"><strong>' + escapeHtml(s.betting_company || "Betting company") + '</strong><span class="company">Published</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>' + escapeHtml(s.total_odds) + '</strong></div><div class="stat"><small>Valid until</small><strong>' + escapeHtml(new Date(s.expires_at).toLocaleString()) + '</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">' + money(s.price_tzs) + '<small>One-time purchase</small></div><button class="buy-button" data-buy="' + escapeHtml(s.id) + '">Buy slip</button></div></article>').join("");
+  panel.innerHTML = panel.innerHTML.replace('<h3>Published betting slips</h3><p class="muted">Loading available slips…</p>', heading + cards);
+  panel.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", () => {
+    if (!currentUser) return showAuth("login");
+    toast("Secure checkout is not enabled yet. No payment has been taken.");
+  }));
 }
 async function loadMarketplace() {
   const root = $("#slips");
