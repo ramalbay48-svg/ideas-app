@@ -79,10 +79,10 @@ function phoneLoginEmail(raw) {
 $("#authForm").addEventListener("submit", async event => {
   event.preventDefault();
   if (!db) return toast("Database is not connected yet.");
-  const raw = $("#phoneInput").value.replace(/\\D/g, "");
+  const raw = $("#phoneInput").value.replace(/\D/g, "");
   const phone = "+255" + raw;
   const password = $("#passwordInput").value;
-  if (!/^[67]\\d{8}$/.test(raw)) return toast("Enter a valid 9-digit Tanzanian mobile number.");
+  if (!/^[67]\d{8}$/.test(raw)) return toast("Enter a valid 9-digit Tanzanian mobile number.");
   if (password.length < 8) return toast("Password must contain at least 8 characters.");
   const mode = event.currentTarget.dataset.mode;
   $("#authSubmit").disabled = true;
