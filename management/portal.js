@@ -120,7 +120,7 @@
     error("");
     try {
       const {error:e} = await client.rpc("admin_review_result_submission", {
-        p_result_submission_id:id, p_decision:decision, p_reason:null
+        p_submission_id:id, p_decision:decision, p_reason:null
       });
       if (e) throw e;
       await loadResultSubmissions();
