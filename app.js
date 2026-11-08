@@ -8,7 +8,7 @@ let currentUser = null;
 let currentProfile = null;
 let activeCompany = "All";
 let selectedSlip = null;
-let otpPendingPhone = null;
+
 
 function toast(message) {
   const node = $("#toast");
@@ -63,63 +63,46 @@ function setAuthMode(mode) {
   const isRegister = mode === "register";
   document.querySelectorAll(".auth-tab").forEach(b => b.classList.toggle("active", b.dataset.auth === mode));
   $("#authTitle").textContent = isRegister ? "Create account" : "Welcome back";
-  $("#authSubmit").textContent = isRegister ? "Send verification code" : "Log in";
+  $("#authSubmit").textContent = isRegister ? "Create account" : "Log in";
   $("#passwordInput").autocomplete = isRegister ? "new-password" : "current-password";
   $("#passwordInput").placeholder = isRegister ? "At least 8 characters" : "Enter your password";
-  $("#authHelp").textContent = isRegister ? "A verification code will be sent by SMS. SMS delivery must be enabled for this Supabase project." : "Enter your Tanzanian number and password.";
+  $("#authHelp").textContent = isRegister ? "Create an account with your phone number and password. No SMS code is sent; phone numbers are not verified." : "Enter your Tanzanian number and password.";
   $("#otpField")?.remove();
   $("#verifyOtpButton")?.remove();
-  otpPendingPhone = null;
+
   $("#authForm").dataset.mode = mode;
 }
-function ensureOtpField() {
-  if ($("#otpField")) return;
-  const label = document.createElement("label");
-  label.id = "otpField";
-  label.className = "field-label";
-  label.textContent = "SMS verification code";
-  const input = document.createElement("input");
-  input.id = "otpInput";
-  input.className = "form-input";
-  input.inputMode = "numeric";
-  input.autocomplete = "one-time-code";
-  input.maxLength = 6;
-  input.placeholder = "Enter the 6-digit code";
-  input.required = true;
-  label.appendChild(input);
-  $("#authForm").appendChild(label);
-  const verify = document.createElement("button");
-  verify.type = "button";
-  verify.id = "verifyOtpButton";
-  verify.className = "primary-action";
-  verify.textContent = "Verify code and finish registration";
-  verify.addEventListener("click", verifyPhoneOtp);
-  $("#authForm").appendChild(verify);
+function phoneLoginEmail(raw) {
+  // Internal login alias only. Customers still use their phone number in the app.
+  return "255" + raw + "@ideasapp.invalid";
 }
 $("#authForm").addEventListener("submit", async event => {
   event.preventDefault();
   if (!db) return toast("Database is not connected yet.");
-  const raw = $("#phoneInput").value.replace(/\D/g, "");
+  const raw = $("#phoneInput").value.replace(/\\D/g, "");
   const phone = "+255" + raw;
   const password = $("#passwordInput").value;
-  if (!/^[67]\d{8}$/.test(raw)) return toast("Enter a valid 9-digit Tanzanian mobile number.");
+  if (!/^[67]\\d{8}$/.test(raw)) return toast("Enter a valid 9-digit Tanzanian mobile number.");
   if (password.length < 8) return toast("Password must contain at least 8 characters.");
   const mode = event.currentTarget.dataset.mode;
   $("#authSubmit").disabled = true;
   try {
+    const email = phoneLoginEmail(raw);
     if (mode === "register") {
-      const {data, error} = await db.auth.signUp({phone, password, options:{data:{display_name:""}}});
+      const {data, error} = await db.auth.signUp({
+        email,
+        password,
+        options: {data: {display_name: "", phone}}
+      });
       if (error) throw error;
       if (data.session) {
         await afterLogin(data.user);
         $("#authModal").close();
-        return toast("Account created successfully.");
+        return toast("Account created. No SMS verification was sent.");
       }
-      otpPendingPhone = phone;
-      ensureOtpField();
-      toast("Verification code requested. Check your SMS.");
+      toast("Account request received. In Supabase, email confirmation must be OFF for password-only registration.");
     } else {
-      const {data, error} = await db.auth.signInWithPassword({phone, password});
+      const {data, error} = await db.auth.signInWithPassword({email, password});
       if (error) throw error;
       await afterLogin(data.user);
       $("#authModal").close();
@@ -131,20 +114,6 @@ $("#authForm").addEventListener("submit", async event => {
     $("#authSubmit").disabled = false;
   }
 });
-async function verifyPhoneOtp() {
-  if (!db || !otpPendingPhone) return;
-  const token = $("#otpInput").value.trim();
-  if (!/^\d{6}$/.test(token)) return toast("Enter the 6-digit verification code.");
-  try {
-    const {data, error} = await db.auth.verifyOtp({phone:otpPendingPhone, token, type:"sms"});
-    if (error) throw error;
-    await afterLogin(data.user);
-    $("#authModal").close();
-    toast("Phone verified. Account created.");
-  } catch (error) {
-    toast(error.message || "Could not verify that code.");
-  }
-}
 async function afterLogin(user) {
   currentUser = user;
   const {data, error} = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
