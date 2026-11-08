@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0D0D0D">
+  <meta name="description" content="IDEAS APP secure management portal for administrators and tipsters">
+  <title>IDEAS APP — Management Portal</title>
+  <link rel="stylesheet" href="portal.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="portal.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><span class="mark">I</span><span>IDEAS <b>APP</b></span></a>
+    <a class="back-link" href="/">Customer app ↗</a>
+  </header>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">MANAGEMENT WORKSPACE</p>
+      <h1>One portal.<br><span>Two powerful roles.</span></h1>
+      <p>Manage tipster applications and marketplace selections from one secure workspace.</p>
+      <div class="status" id="connectionStatus">Connecting to IDEAS APP database…</div>
+    </section>
+    <section class="login-card" id="loginPanel">
+      <div class="section-kicker">SECURE ACCESS</div>
+      <h2>Sign in to continue</h2>
+      <p class="muted">Use the same Tanzanian phone number and password as your customer app account.</p>
+      <form id="loginForm">
+        <label for="phone">Phone number</label>
+        <div class="phone"><span>+255</span><input id="phone" type="tel" inputmode="numeric" maxlength="9" placeholder="7XX XXX XXX" pattern="[67][0-9]{8}" required></div>
+        <label for="password">Password</label>
+        <input id="password" type="password" minlength="8" placeholder="Your account password" required>
+        <button class="primary" id="loginButton">Sign in</button>
+      </form>
+      <p class="hint">No SMS code is sent. Phone number ownership is not verified.</p>
+      <p class="error" id="loginError" role="alert"></p>
+    </section>
+
+    <section class="workspace hidden" id="workspace">
+      <div class="welcome-row">
+        <div><p class="eyebrow" id="roleLabel">WORKSPACE</p><h2 id="welcomeTitle">Welcome</h2><p class="muted" id="accountPhone"></p></div>
+        <button class="quiet" id="logoutButton">Log out</button>
+      </div>
+      <div class="role-notice" id="roleNotice"></div>
+
+      <section class="panel hidden" id="applyPanel">
+        <div class="panel-heading"><div><p class="eyebrow">TIPSTER ONBOARDING</p><h3>Apply to become a tipster</h3></div><span class="tag">APPLICATION</span></div>
+        <p class="muted">Submit your public username and a short description. An administrator must approve your application before you can publish selections.</p>
+        <form id="applyForm">
+          <label for="username">Username (letters, numbers and underscore)</label>
+          <input id="username" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" placeholder="e.g. SmartPicksTZ" required>
+          <label for="bio">Short bio</label>
+          <textarea id="bio" maxlength="240" rows="3" placeholder="Tell customers about your tipster service"></textarea>
+          <button class="primary">Submit application</button>
+        </form>
+        <p class="hint" id="applicationStatus"></p>
+      </section>
+
+      <section class="panel hidden" id="adminPanel">
+        <div class="panel-heading"><div><p class="eyebrow">ADMINISTRATION</p><h3>Tipster applications</h3></div><span class="tag">ADMIN</span></div>
+        <p class="muted">Review applications before granting tipster access. Approval also enables the tipster role.</p>
+        <div id="applicationList" class="records">Loading applications…</div>
+      </section>
+
+      <section class="panel hidden" id="tipsterPanel">
+        <div class="panel-heading"><div><p class="eyebrow">TIPSTER WORKSPACE</p><h3>Publish a betslip</h3></div><span class="tag">APPROVED TIPSTER</span></div>
+        <p class="muted">Create a marketplace listing with odds, price and expiry. This first portal version publishes listing details only; secure private image uploads and payment unlocking will be added before paid sales are enabled.</p>
+        <form id="slipForm">
+          <label for="odds">Total odds</label><input id="odds" type="number" min="1.01" step="0.01" placeholder="e.g. 5.50" required>
+          <label for="price">Price (TZS)</label><input id="price" type="number" min="1" step="1" placeholder="e.g. 2500" required>
+          <label for="company">Betting company</label>
+          <select id="company" required><option value="">Choose company</option><option>SportPesa</option><option>Betika</option><option>BetPawa</option><option>Meridianbet</option><option>Other</option></select>
+          <label for="expiry">Expiry date and time</label><input id="expiry" type="datetime-local" required>
+          <button class="primary">Publish listing</button>
+        </form>
+        <p class="hint" id="slipStatus"></p>
+        <div class="subheading">Your listings</div>
+        <div id="mySlips" class="records">Loading your listings…</div>
+      </section>
+      <p class="error" id="workspaceError" role="alert"></p>
+    </section>
+    <footer>IDEAS APP · Management Portal · <span>Secure role-based access</span></footer>
+  </main>
+</body>
+</html>
