@@ -140,21 +140,13 @@ async function loadTipstersPage(panel) {
   const {data, error} = await db.from("tipsters").select("id,username,bio,profiles(display_name)").eq("status","approved").order("created_at",{ascending:false});
   if (error) { panel.innerHTML = '<h2>Tipsters</h2><p class="muted">Could not load tipsters. Check database permissions.</p>'; return; }
   if (!data?.length) { panel.innerHTML = '<h2>Approved tipsters</h2><div class="empty">No approved tipsters yet. Check back soon.</div>'; return; }
-  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + data.map(t => '<article class="tipster" role="button" tabindex="0" data-tipster="' + escapeHtml(t.id) + '" aria-label="Open tipster @' + escapeHtml(t.username) + '"><div class="tipster-avatar">'+escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase())+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p><small class="muted">Tap to view profile and available slips →</small></article>').join("") + '</div>';
-  panel.onclick = event => {
-    const card = event.target.closest("[data-tipster]");
-    if (!card || !panel.contains(card)) return;
-    const selected = data.find(t => t.id === card.dataset.tipster);
-    if (selected) loadTipsterDetail(panel, selected);
-  };
-  panel.onkeydown = event => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const card = event.target.closest("[data-tipster]");
-    if (!card || !panel.contains(card)) return;
-    event.preventDefault();
-    const selected = data.find(t => t.id === card.dataset.tipster);
-    if (selected) loadTipsterDetail(panel, selected);
-  };
+  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + data.map(t => '<article class="tipster"><div class="tipster-avatar">'+escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase())+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p><button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>').join("") + '</div>';
+  panel.querySelectorAll("[data-open-tipster]").forEach(button => {
+    button.addEventListener("click", () => {
+      const selected = data.find(t => t.id === button.dataset.openTipster);
+      if (selected) loadTipsterDetail(panel, selected);
+    });
+  });
 }
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
