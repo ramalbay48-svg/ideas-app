@@ -1,4 +1,4 @@
-// IDEAS APP Management Portal. Only the publishable Supabase key is used in this browser.
+// IDEAS APP Management Portal. Browser uses only the Supabase publishable key.
 (() => {
   const URL = "https://hclgguciyhdqaqsvuddp.supabase.co";
   const KEY = "sb_publishable_6WzBBcoIz8YABVp2KlHh8A_vSOOKbJU";
@@ -36,10 +36,11 @@
     $("accountPhone").textContent = profile.phone || "IDEAS APP account";
     $("roleLabel").textContent = String(profile.role || "customer").toUpperCase() + " WORKSPACE";
     if (profile.role === "admin") {
-      $("roleNotice").textContent = "Administrator access: review tipster applications and approve or reject applicants.";
+      $("roleNotice").textContent = "Administrator access: review tipster applications. Decisions are checked and recorded by the database.";
       $("adminPanel").classList.remove("hidden");
       $("applyPanel").classList.add("hidden");
       await loadApplications();
+      await loadAuditLogs();
     } else if (profile.role === "tipster") {
       $("roleNotice").textContent = "Tipster access: create and manage your marketplace listings.";
       $("tipsterPanel").classList.remove("hidden");
@@ -87,14 +88,24 @@
   async function reviewTipster(id, decision) {
     error("");
     try {
-      const {data,error:e} = await client.from("tipsters").update({status:decision}).eq("id",id).select("user_id").single();
+      const {data,error:e} = await client.rpc("review_tipster_application", {
+        p_tipster_id:id, p_decision:decision, p_reason:null
+      });
       if (e) throw e;
-      if (decision === "approved") {
-        const {error:roleError} = await client.from("profiles").update({role:"tipster"}).eq("id",data.user_id);
-        if (roleError) throw roleError;
-      }
+      if (!data?.success) throw new Error("The database did not confirm the decision.");
       await loadApplications();
+      await loadAuditLogs();
     } catch (e) { error("Could not update application: " + (e.message || "Unknown error")); }
+  }
+
+  async function loadAuditLogs() {
+    $("auditList").textContent = "Loading recent admin activity…";
+    const {data,error:e} = await client.from("admin_audit_logs")
+      .select("action,target_type,target_id,reason,created_at,details")
+      .order("created_at",{ascending:false}).limit(20);
+    if (e) throw e;
+    if (!data?.length) { $("auditList").textContent = "No admin actions have been recorded yet."; return; }
+    $("auditList").innerHTML = data.map(a => '<article class="record"><strong>'+esc(a.action.replaceAll("_"," "))+'</strong><small>'+esc(new Date(a.created_at).toLocaleString())+'</small><p class="muted">'+esc(a.details?.username ? "@"+a.details.username : a.target_type || "")+(a.reason ? " · "+esc(a.reason) : "")+'</p></article>').join("");
   }
 
   async function loadTipster() {
@@ -112,14 +123,7 @@
       if (!tipster) await loadTipster();
       const expiry = new Date($("expiry").value);
       if (!(expiry > new Date())) throw new Error("Choose a future expiry date and time.");
-      const payload = {
-        tipster_id:tipster.id,
-        total_odds:Number($("odds").value),
-        price_tzs:Math.round(Number($("price").value)),
-        betting_company:$("company").value,
-        expires_at:expiry.toISOString(),
-        status:"published"
-      };
+      const payload = {tipster_id:tipster.id,total_odds:Number($("odds").value),price_tzs:Math.round(Number($("price").value)),betting_company:$("company").value,expires_at:expiry.toISOString(),status:"published"};
       const {error:e2} = await client.from("betslips").insert(payload);
       if (e2) throw e2;
       $("slipStatus").textContent = "Listing published. It should now appear in the customer app marketplace.";
