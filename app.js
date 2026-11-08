@@ -1,3 +1,26 @@
+// Supabase public client configuration. The publishable key is intended for browser use.
+const IDEAS_SUPABASE_URL = "https://hclgguciyhdqaqsvuddp.supabase.co";
+const IDEAS_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_6WzBBcoIz8YABVp2KlHh8A_vSOOKbJU";
+let ideasSupabaseClient = null;
+const backendStatus = document.querySelector("#backendStatus");
+try {
+  if (window.supabase && window.supabase.createClient) {
+    ideasSupabaseClient = window.supabase.createClient(IDEAS_SUPABASE_URL, IDEAS_SUPABASE_PUBLISHABLE_KEY);
+    ideasSupabaseClient.from("announcements").select("id").limit(1).then(({ error }) => {
+      if (backendStatus) backendStatus.textContent = error ? "Backend connection needs attention." : "Database connection: connected";
+      if (error) console.error("IDEAS APP backend check:", error.message);
+    }).catch(error => {
+      if (backendStatus) backendStatus.textContent = "Backend connection needs attention.";
+      console.error("IDEAS APP backend check:", error);
+    });
+  } else if (backendStatus) {
+    backendStatus.textContent = "Backend library did not load. Check your internet connection.";
+  }
+} catch (error) {
+  if (backendStatus) backendStatus.textContent = "Backend connection needs attention.";
+  console.error("IDEAS APP Supabase setup:", error);
+}
+
 const tipsters=[
   {name:"Alpha Tips",handle:"@alphatips",initial:"A",verified:true},
   {name:"Golden Picks",handle:"@goldenpicks",initial:"G",verified:true},
@@ -8,7 +31,8 @@ const slips=[
   {id:2,name:"Golden Picks",handle:"@goldenpicks",initial:"G",company:"Betika",odds:"5.20",price:3000,expires:"5h 10m"},
   {id:3,name:"Smart Analyst",handle:"@smartanalyst",initial:"S",company:"BetPawa",odds:"12.00",price:2000,expires:"Tomorrow"}
 ];
-let activeCompany="All";\nlet selectedCheckoutSlip=null;
+let activeCompany="All";
+let selectedCheckoutSlip=null;
 const tipsterRoot=document.querySelector("#tipsters");
 const slipRoot=document.querySelector("#slips");
 const search=document.querySelector("#searchInput");
