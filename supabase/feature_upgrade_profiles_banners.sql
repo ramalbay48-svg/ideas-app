@@ -4,6 +4,20 @@ begin;
 alter table public.announcements add column if not exists image_url text;
 alter table public.announcements add column if not exists updated_at timestamptz not null default now();
 
+
+-- Let tipsters edit their own profile fields without allowing self-promotion to admin.
+create or replace function public.current_ideas_role()
+returns text language sql stable security definer set search_path=public
+as $ select role from public.profiles where id=auth.uid() $;
+revoke all on function public.current_ideas_role() from public, anon;
+grant execute on function public.current_ideas_role() to authenticated;
+
+drop policy if exists "ideas_profiles_update_own_or_admin" on public.profiles;
+create policy "ideas_profiles_update_own_or_admin" on public.profiles
+for update to authenticated
+using (id=auth.uid() or public.is_ideas_admin())
+with check ((id=auth.uid() and role=public.current_ideas_role()) or public.is_ideas_admin());
+
 -- Approved tipsters may edit only their own public tipster profile.
 drop policy if exists "ideas_tipsters_owner_update_profile" on public.tipsters;
 create policy "ideas_tipsters_owner_update_profile" on public.tipsters
