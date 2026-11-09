@@ -24,6 +24,10 @@ function escapeHtml(value) {
 function money(value) {
   return "TZS " + Number(value || 0).toLocaleString("en-US");
 }
+function publicAvatar(path) {
+  if (!path || !db) return "";
+  return db.storage.from("ideas-public-media").getPublicUrl(path).data.publicUrl;
+}
 function showPage(page) {
   const homeSections = [".welcome", ".banner", ".section", ".notice"];
   homeSections.forEach(selector => document.querySelectorAll(selector).forEach(el => el.hidden = page !== "home"));
@@ -138,7 +142,7 @@ function updateAccountControls() {
 async function loadTipstersPage(panel) {
   panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><p class="muted">Loading tipsters…</p>';
   if (!db) return;
-  const {data, error} = await db.from("tipsters").select("id,username,bio,profiles(display_name)").eq("status","approved").order("created_at",{ascending:false});
+  const {data, error} = await db.from("tipsters").select("id,username,bio,profiles(display_name,avatar_path)").eq("status","approved").order("created_at",{ascending:false});
   if (error) { panel.innerHTML = '<h2>Tipsters</h2><p class="muted">Could not load tipsters. Check database permissions.</p>'; return; }
   if (!data?.length) { panel.innerHTML = '<h2>Approved tipsters</h2><div class="empty">No approved tipsters yet. Check back soon.</div>'; return; }
   panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + data.map(t => '<article class="tipster"><div class="tipster-avatar">'+escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase())+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p><button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>').join("") + '</div>';
@@ -308,8 +312,8 @@ async function initialize() {
     else { currentUser=null; currentProfile=null; updateAccountControls(); }
   });
   await loadMarketplace();
-  const {data:news} = await db.from("announcements").select("title,message").eq("active",true).limit(1).maybeSingle();
-  if (news && $(".banner p")) $(".banner p").textContent = news.message;
+  const {data:news} = await db.from("announcements").select("title,message,image_url").eq("active",true).order("created_at",{ascending:false}).limit(1).maybeSingle();
+  if (news) { const banner=$(".banner"); if (banner) { banner.querySelector("h2").textContent=news.title; banner.querySelector("p").textContent=news.message; if(news.image_url){banner.style.backgroundImage="linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.18)),url("+JSON.stringify(news.image_url)+")";banner.style.backgroundSize="cover";banner.style.backgroundPosition="center";} } }
   updateAccountControls();
 }
 initialize();
