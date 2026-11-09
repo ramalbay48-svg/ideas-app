@@ -1,0 +1,16 @@
+{
+  "name": "ideas-app-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IDEAS APP Android wrapper build",
+  "scripts": {
+    "build:android": "node scripts/prepare-android.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.1"
+  }
+}
