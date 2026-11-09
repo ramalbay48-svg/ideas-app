@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0D0D0D">
+<meta name="description" content="IDEAS APP Tipster — apply and manage your approved tipster account"><title>IDEAS APP Tipster</title>
+<link rel="stylesheet" href="tipster.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="tipster.js"></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="./"><span class="mark">I</span><span>IDEAS <b>APP</b> · TIPSTER</span></a><a class="back-link" href="/">Customer app ↗</a></header>
+<main class="shell">
+<section class="hero"><p class="eyebrow">IDEAS APP TIPSTER</p><h1>Share your <span>insights.</span></h1><p>Apply to become a tipster. Our administrator reviews every application before publishing access is enabled.</p><div class="status" id="connectionStatus">Connecting to IDEAS APP database…</div></section>
+<section class="login-card" id="authPanel">
+<div class="section-kicker">YOUR ACCOUNT</div><h2 id="authHeading">Sign in or create account</h2><p class="muted">Use your Tanzanian phone number and password. No SMS code is sent.</p>
+<div class="auth-tabs"><button type="button" class="active" data-mode="login">Log in</button><button type="button" data-mode="register">Create account</button></div>
+<form id="authForm"><label for="phone">Phone number</label><div class="phone"><span>+255</span><input id="phone" type="tel" inputmode="numeric" maxlength="9" pattern="[67][0-9]{8}" placeholder="7XX XXX XXX" required></div>
+<label for="password">Password</label><input id="password" type="password" minlength="8" placeholder="At least 8 characters" required>
+<button class="primary" id="authButton">Log in</button></form><p class="hint" id="authStatus"></p><p class="hint">Phone number ownership is not verified. Keep your password private.</p>
+</section>
+<section class="workspace hidden" id="workspace">
+<div class="welcome-row"><div><p class="eyebrow" id="roleLabel">TIPSTER WORKSPACE</p><h2 id="welcomeTitle">Welcome</h2><p class="muted" id="accountPhone"></p></div><button class="quiet" id="logoutButton">Log out</button></div>
+<section class="panel hidden" id="applyPanel"><div class="panel-heading"><div><p class="eyebrow">APPLICATION</p><h3>Apply to become a tipster</h3></div><span class="tag">REVIEW REQUIRED</span></div>
+<p class="muted">Choose a public username and tell customers briefly about your tipster service. You cannot publish until an administrator approves your application.</p>
+<form id="applyForm"><label for="displayName">Your display name</label><input id="displayName" maxlength="50" placeholder="Your name" required>
+<label for="username">Public username</label><input id="username" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" placeholder="e.g. SmartPicksTZ" required>
+<label for="bio">Short description</label><textarea id="bio" maxlength="240" rows="3" placeholder="Tell customers about your experience and service"></textarea>
+<button class="primary" id="applyButton">Send application</button></form><p class="hint" id="applicationStatus"></p></section>
+<section class="panel hidden" id="statusPanel"><div class="panel-heading"><div><p class="eyebrow">APPLICATION STATUS</p><h3 id="statusHeading">Application received</h3></div><span class="tag" id="statusTag">PENDING</span></div><p class="muted" id="statusMessage">Your application is waiting for administrator review.</p></section>
+<section class="panel hidden" id="tipsterPanel"><div class="panel-heading"><div><p class="eyebrow">APPROVED TIPSTER</p><h3 id="tipsterHeading">Your workspace</h3></div><span class="tag">APPROVED</span></div>
+<p class="muted">Your account has been approved. Submit betslip details and an image as a private draft. A draft is not published or visible to customers until the marketplace review process is completed.</p>
+<form id="slipForm"><label for="odds">Total odds</label><input id="odds" type="number" min="1.01" step="0.01" placeholder="e.g. 5.50" required>
+<label for="price">Selling price (TZS)</label><input id="price" type="number" min="1" step="1" placeholder="e.g. 2500" required>
+<label for="company">Betting company</label><select id="company" required><option value="">Choose company</option><option>SportPesa</option><option>Betika</option><option>BetPawa</option><option>Meridianbet</option><option>Other</option></select>
+<label for="expiry">Expiry date and time</label><input id="expiry" type="datetime-local" required>
+<label for="image">Betslip picture (JPG, PNG or WebP, max 5 MB)</label><input id="image" type="file" accept="image/jpeg,image/png,image/webp" required>
+<button class="primary" id="uploadButton">Upload private draft</button></form><p class="hint" id="slipStatus"></p><div class="subheading">Your drafts and listings</div><div class="records" id="mySlips">Loading…</div></section>
+<p class="error" id="workspaceError" role="alert"></p>
+</section><footer>IDEAS APP · TIPSTER · <span>Approval required before publishing</span></footer>
+</main>
+</body></html>
