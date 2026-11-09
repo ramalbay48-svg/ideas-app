@@ -1,4 +1,4 @@
-name: Build IDEAS APP Android APK
+name: Build IDEAS APP Android Apps
 
 on:
   workflow_dispatch:
@@ -34,19 +34,41 @@ jobs:
           java-version: "17"
       - name: Install dependencies
         run: npm install
-      - name: Prepare app screens
+
+      - name: Prepare customer app
         run: npm run build:android
-      - name: Add Android platform
+        env:
+          APP_VARIANT: customer
+      - name: Add customer Android platform
         run: npx cap add android
-      - name: Sync Android project
+      - name: Sync customer Android app
         run: npx cap sync android
-      - name: Build debug APK
+      - name: Build customer APK
         working-directory: android
         run: ./gradlew assembleDebug
-      - name: Upload APK
+      - name: Save customer APK
+        run: mkdir -p dist && cp android/app/build/outputs/apk/debug/app-debug.apk dist/ideas-app-customer.apk
+
+      - name: Prepare management app
+        run: |
+          rm -rf android www
+          npm run build:android
+        env:
+          APP_VARIANT: management
+      - name: Add management Android platform
+        run: npx cap add android
+      - name: Sync management Android app
+        run: npx cap sync android
+      - name: Build management APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - name: Save management APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk dist/ideas-app-management.apk
+
+      - name: Upload both Android apps
         uses: actions/upload-artifact@v4
         with:
-          name: ideas-app-android-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: ideas-app-two-android-apks
+          path: dist/*.apk
           if-no-files-found: error
           retention-days: 14
