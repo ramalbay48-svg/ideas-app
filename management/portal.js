@@ -30,29 +30,21 @@
     if (profileError) throw profileError;
     if (!data) throw new Error("Your profile could not be found. Please contact the app administrator.");
     profile = data;
+    if (profile.role !== "admin") {
+      throw new Error("This app is for administrators only. Please use the IDEAS APP Tipster app or Customer app.");
+    }
     $("loginPanel").classList.add("hidden");
     $("workspace").classList.remove("hidden");
     $("welcomeTitle").textContent = "Welcome" + (profile.display_name ? ", " + profile.display_name : "");
     $("accountPhone").textContent = profile.phone || "IDEAS APP account";
-    $("roleLabel").textContent = String(profile.role || "customer").toUpperCase() + " WORKSPACE";
-    if (profile.role === "admin") {
-      $("roleNotice").textContent = "Administrator access: review tipster applications. Decisions are checked and recorded by the database.";
-      $("adminPanel").classList.remove("hidden");
-      $("resultsPanel").classList.remove("hidden");
-      $("auditPanel").classList.remove("hidden");
-      $("applyPanel").classList.add("hidden");
-      await loadApplications();
-      await loadResultSubmissions();
-      await loadAuditLogs();
-    } else if (profile.role === "tipster") {
-      $("roleNotice").textContent = "Tipster access: create and manage your marketplace listings.";
-      $("tipsterPanel").classList.remove("hidden");
-      await loadTipster();
-    } else {
-      $("roleNotice").textContent = "Customer account: apply below to become a tipster. Publishing access starts only after admin approval.";
-      $("applyPanel").classList.remove("hidden");
-      await checkApplication();
-    }
+    $("roleLabel").textContent = "ADMINISTRATOR WORKSPACE";
+    $("roleNotice").textContent = "Administrator access: review tipster applications. Decisions are checked and recorded by the database.";
+    $("adminPanel").classList.remove("hidden");
+    $("resultsPanel").classList.remove("hidden");
+    $("auditPanel").classList.remove("hidden");
+    await loadApplications();
+    await loadResultSubmissions();
+    await loadAuditLogs();
   }
 
   async function checkApplication() {
