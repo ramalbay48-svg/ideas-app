@@ -20,8 +20,7 @@
 <div class="welcome-row"><div><p class="eyebrow" id="roleLabel">TIPSTER WORKSPACE</p><h2 id="welcomeTitle">Welcome</h2><p class="muted" id="accountPhone"></p></div><button class="quiet" id="logoutButton">Log out</button></div>
 <section class="panel hidden" id="applyPanel"><div class="panel-heading"><div><p class="eyebrow">APPLICATION</p><h3>Apply to become a tipster</h3></div><span class="tag">REVIEW REQUIRED</span></div>
 <p class="muted">Choose a public username and tell customers briefly about your tipster service. You cannot publish until an administrator approves your application.</p>
-<form id="applyForm"><label for="displayName">Your display name</label><input id="displayName" maxlength="50" placeholder="Your name" required>
-<label for="username">Public username</label><input id="username" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" placeholder="e.g. SmartPicksTZ" required>
+<form id="applyForm"><label for="username">Public username</label><input id="username" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" placeholder="e.g. SmartPicksTZ" required>
 <label for="bio">Short description</label><textarea id="bio" maxlength="240" rows="3" placeholder="Tell customers about your experience and service"></textarea>
 <button class="primary" id="applyButton">Send application</button></form><p class="hint" id="applicationStatus"></p></section>
 <section class="panel hidden" id="statusPanel"><div class="panel-heading"><div><p class="eyebrow">APPLICATION STATUS</p><h3 id="statusHeading">Application received</h3></div><span class="tag" id="statusTag">PENDING</span></div><p class="muted" id="statusMessage">Your application is waiting for administrator review.</p></section>
