@@ -120,9 +120,9 @@
 
   async function saveTipster(id) {
     try {
-      const username=$("[data-username='"+id+"']").value.trim();
-      const bio=$("[data-bio='"+id+"']").value.trim();
-      const displayName=$("[data-display='"+id+"']").value.trim();
+      const username=document.querySelector("[data-username='"+id+"']").value.trim();
+      const bio=document.querySelector("[data-bio='"+id+"']").value.trim();
+      const displayName=document.querySelector("[data-display='"+id+"']").value.trim();
       const {error:e}=await client.rpc("admin_update_tipster_profile",{p_tipster_id:id,p_username:username,p_bio:bio,p_display_name:displayName});
       if(e)throw e;
       error("Tipster profile saved.");
