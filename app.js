@@ -130,8 +130,9 @@ function updateAccountControls() {
     toast("Logged out.");
     showPage("home");
   } : () => showAuth("login");
-  $("#tipsterOpen").hidden = !currentProfile || !["tipster","admin"].includes(currentProfile.role);
-  $("#adminOpen").hidden = !currentProfile || currentProfile.role !== "admin";
+  // Customer app has no tipster or management entry points. Those functions live in separate apps.
+  $("#tipsterOpen").hidden = true;
+  $("#adminOpen").hidden = true;
 }
 
 async function loadTipstersPage(panel) {
