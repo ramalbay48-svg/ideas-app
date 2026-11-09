@@ -111,9 +111,9 @@
       <label class="field-label" for="slipImage">Betslip picture</label>
       <input class="file-input" id="slipImage" name="image" type="file" accept="image/*" required>
       <div class="image-preview" id="slipImagePreview">Your selected betslip image preview will appear here.</div>
-      <button class="primary-action" type="submit">Prepare slip draft</button>
+      <button class="primary-action" type="submit">Upload private draft</button>
     </form>
-    <p class="demo-warning">Demo only: this does not upload or publish a real slip. The image is previewed on this device only. Tipster approval, server storage, price limits and publishing controls must be connected before launch.</p>
+    <p class="demo-warning">Uploads are saved as private drafts for admin review. Drafts are not visible in the marketplace. Only approved tipster accounts can upload; images must be JPG, PNG or WebP up to 5 MB.</p>
   </dialog>
 
   <dialog class="modal checkout-modal" id="checkoutModal">
@@ -157,6 +157,6 @@
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
