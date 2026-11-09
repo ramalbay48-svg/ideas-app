@@ -43,6 +43,7 @@
     $("resultsPanel").classList.remove("hidden");
     $("auditPanel").classList.remove("hidden");
     await loadApplications();
+    await renderAdminTools();
     await loadResultSubmissions();
     await loadAuditLogs();
   }
@@ -90,6 +91,78 @@
       await loadApplications();
       await loadAuditLogs();
     } catch (e) { error("Could not update application: " + (e.message || "Unknown error")); }
+  }
+
+
+  async function renderAdminTools() {
+    let tools = $("adminToolsPanel");
+    if (!tools) {
+      tools = document.createElement("section");
+      tools.id = "adminToolsPanel";
+      tools.className = "panel";
+      $("adminPanel").appendChild(tools);
+    }
+    tools.innerHTML = '<div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div><div class="subheading">Customer app banners</div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label>Optional banner image URL</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div>';
+    await loadManagedTipsters();
+    await loadBanners();
+    $("bannerForm").addEventListener("submit", saveBanner);
+  }
+
+  async function loadManagedTipsters() {
+    const root = $("managedTipsters");
+    const {data,error:e} = await client.from("tipsters").select("id,user_id,username,bio,status,profiles(display_name,phone)").order("created_at",{ascending:false});
+    if (e) { root.textContent = "Could not load tipsters: " + e.message; return; }
+    if (!data?.length) { root.textContent = "No tipsters found."; return; }
+    root.innerHTML = data.map(t => '<article class="record"><div class="record-head"><strong>@'+esc(t.username)+'</strong><span class="tag">'+esc(t.status)+'</span></div><small>'+esc(t.profiles?.display_name||"")+' · '+esc(t.profiles?.phone||"")+'</small><label>Display name</label><input data-display="'+t.id+'" value="'+esc(t.profiles?.display_name||"")+'" maxlength="60"><label>Username</label><input data-username="'+t.id+'" value="'+esc(t.username)+'" maxlength="24"><label>Description</label><textarea data-bio="'+t.id+'" rows="2" maxlength="240">'+esc(t.bio||"")+'</textarea><div class="record-actions"><button class="approve" data-save-tipster="'+t.id+'">Save changes</button><button class="reject" data-remove-tipster="'+t.id+'">Remove tipster</button></div></article>').join("");
+    root.querySelectorAll("[data-save-tipster]").forEach(b=>b.addEventListener("click",()=>saveTipster(b.dataset.saveTipster)));
+    root.querySelectorAll("[data-remove-tipster]").forEach(b=>b.addEventListener("click",()=>removeTipster(b.dataset.removeTipster)));
+  }
+
+  async function saveTipster(id) {
+    try {
+      const username=document.querySelector("[data-username='"+id+"']").value.trim();
+      const bio=document.querySelector("[data-bio='"+id+"']").value.trim();
+      const displayName=document.querySelector("[data-display='"+id+"']").value.trim();
+      const {error:e}=await client.rpc("admin_update_tipster_profile",{p_tipster_id:id,p_username:username,p_bio:bio,p_display_name:displayName});
+      if(e)throw e;
+      error("Tipster profile saved.");
+      await loadManagedTipsters(); await loadApplications(); await loadAuditLogs();
+    } catch(e) { error("Could not save tipster: "+(e.message||"Unknown error")); }
+  }
+
+  async function removeTipster(id) {
+    if (!confirm("Remove this tipster from public access? Their historical sales and results will be preserved.")) return;
+    try {
+      const {error:e}=await client.rpc("admin_remove_tipster",{p_tipster_id:id});
+      if(e)throw e;
+      error("Tipster removed from public access.");
+      await loadManagedTipsters(); await loadApplications(); await loadAuditLogs();
+    } catch(e) { error("Could not remove tipster: "+(e.message||"Unknown error")); }
+  }
+
+  async function loadBanners() {
+    const root=$("bannerList");
+    const {data,error:e}=await client.from("announcements").select("id,title,message,image_url,active").order("created_at",{ascending:false});
+    if(e){root.textContent="Could not load banners: "+e.message;return;}
+    if(!data?.length){root.textContent="No banners created yet.";return;}
+    root.innerHTML=data.map(a=>'<article class="record"><div class="record-head"><strong>'+esc(a.title)+'</strong><span class="tag">'+(a.active?"ACTIVE":"HIDDEN")+'</span></div><p class="muted">'+esc(a.message)+'</p><div class="record-actions"><button class="approve" data-edit-banner="'+a.id+'">Edit</button><button class="reject" data-delete-banner="'+a.id+'">Delete</button></div></article>').join("");
+    root.querySelectorAll("[data-edit-banner]").forEach(b=>b.addEventListener("click",()=>{const a=data.find(x=>x.id===b.dataset.editBanner);$("bannerTitle").value=a.title;$("bannerMessage").value=a.message;$("bannerImage").value=a.image_url||"";$("bannerActive").checked=a.active;$("bannerForm").dataset.editId=a.id;}));
+    root.querySelectorAll("[data-delete-banner]").forEach(b=>b.addEventListener("click",async()=>{if(!confirm("Delete this banner?"))return;const {error:e2}=await client.from("announcements").delete().eq("id",b.dataset.deleteBanner);if(e2){sayBanner(e2.message);return;}await loadBanners();}));
+  }
+
+  function sayBanner(message){$("bannerStatus").textContent=message;}
+
+  async function saveBanner(e) {
+    e.preventDefault();
+    const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:$("bannerImage").value.trim()||null,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
+    try {
+      const id=$("bannerForm").dataset.editId;
+      const result=id?await client.from("announcements").update(payload).eq("id",id):await client.from("announcements").insert(payload);
+      if(result.error)throw result.error;
+      $("bannerForm").reset();delete $("bannerForm").dataset.editId;$("bannerActive").checked=true;
+      sayBanner("Banner saved. It will appear in the Customer App.");
+      await loadBanners();
+    } catch(e2){sayBanner(e2.message||"Could not save banner.");}
   }
 
   async function loadResultSubmissions() {
