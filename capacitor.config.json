@@ -1,0 +1,9 @@
+{
+  "appId": "com.ideasapp.marketplace",
+  "appName": "IDEAS APP",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  }
+}
