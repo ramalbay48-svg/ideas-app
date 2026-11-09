@@ -218,6 +218,68 @@ $("#adminOpen").addEventListener("click", () => {
   if (currentProfile?.role !== "admin") return toast("Admin access required.");
   $("#adminDashboard").showModal();
 });
+
+const slipImageInput = $("#slipImage");
+slipImageInput.addEventListener("change", () => {
+  const file = slipImageInput.files?.[0];
+  const preview = $("#slipImagePreview");
+  if (!file) { preview.textContent = "Your selected betslip image preview will appear here."; return; }
+  if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+    slipImageInput.value = "";
+    preview.textContent = "Choose a JPG, PNG or WebP image no larger than 5 MB.";
+    return toast("Image must be JPG, PNG or WebP and no larger than 5 MB.");
+  }
+  const url = URL.createObjectURL(file);
+  preview.innerHTML = '<img alt="Selected betslip preview" src="' + url + '" style="max-width:100%;max-height:260px;object-fit:contain;border-radius:12px">';
+});
+$("#slipUploadForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!db || !currentUser) return toast("Please log in first.");
+  const submit = event.currentTarget.querySelector('button[type="submit"]');
+  const odds = Number($("#slipOdds").value);
+  const price = Number($("#slipPrice").value);
+  const company = $("#slipCompany").value;
+  const expiryValue = $("#slipExpiry").value;
+  const file = slipImageInput.files?.[0];
+  const expiresAt = new Date(expiryValue);
+  if (!Number.isFinite(odds) || odds <= 1 || !Number.isSafeInteger(price) || price < 1 || !company || !expiryValue || !Number.isFinite(expiresAt.getTime()) || expiresAt <= new Date()) {
+    return toast("Check the odds, price, company and future expiry time.");
+  }
+  if (!file || !["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+    return toast("Choose a JPG, PNG or WebP image no larger than 5 MB.");
+  }
+  submit.disabled = true;
+  submit.textContent = "Uploading securely…";
+  let uploadedPath = null;
+  try {
+    const {data:tipster,error:tipsterError} = await db.from("tipsters").select("id").eq("user_id",currentUser.id).eq("status","approved").maybeSingle();
+    if (tipsterError) throw tipsterError;
+    if (!tipster) throw new Error("This login has no approved tipster profile. Sign in with the account that owns the approved tipster profile.");
+    const {data:slip,error:slipError} = await db.from("betslips").insert({
+      tipster_id:tipster.id,total_odds:odds,price_tzs:price,betting_company:company,expires_at:expiresAt.toISOString(),status:"draft"
+    }).select("id").single();
+    if (slipError) throw slipError;
+    const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]/g,"-").slice(-80) || "betslip-image";
+    uploadedPath = currentUser.id + "/" + slip.id + "/" + safeName;
+    const {error:uploadError} = await db.storage.from("ideas-betslips").upload(uploadedPath,file,{cacheControl:"3600",upsert:false,contentType:file.type});
+    if (uploadError) throw uploadError;
+    const {error:assetError} = await db.from("slip_assets").insert({slip_id:slip.id,storage_path:uploadedPath});
+    if (assetError) {
+      await db.storage.from("ideas-betslips").remove([uploadedPath]);
+      throw assetError;
+    }
+    event.currentTarget.reset();
+    $("#slipImagePreview").textContent = "Your selected betslip image preview will appear here.";
+    toast("Betslip uploaded as a private draft. It is not published yet.");
+  } catch(error) {
+    console.error("Betslip draft upload:",error);
+    toast(error.message || "Could not upload this draft. Please try again.");
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Upload private draft";
+  }
+});
+
 $("#dashboardClose").addEventListener("click",()=>$("#tipsterDashboard").close());
 $("#adminClose").addEventListener("click",()=>$("#adminDashboard").close());
 $("#profileClose").addEventListener("click",()=>$("#profileModal").close());
