@@ -8,7 +8,7 @@ alter table public.announcements add column if not exists updated_at timestamptz
 -- Let tipsters edit their own profile fields without allowing self-promotion to admin.
 create or replace function public.current_ideas_role()
 returns text language sql stable security definer set search_path=public
-as $ select role from public.profiles where id=auth.uid() $;
+as $body$ select role from public.profiles where id=auth.uid() $body$;
 revoke all on function public.current_ideas_role() from public, anon;
 grant execute on function public.current_ideas_role() to authenticated;
 
