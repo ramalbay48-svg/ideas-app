@@ -19,6 +19,7 @@ using (id=auth.uid() or public.is_ideas_admin())
 with check ((id=auth.uid() and role=public.current_ideas_role()) or public.is_ideas_admin());
 
 -- Approved tipsters may edit only their own public tipster profile.
+grant update (bio, updated_at) on public.tipsters to authenticated;
 drop policy if exists "ideas_tipsters_owner_update_profile" on public.tipsters;
 create policy "ideas_tipsters_owner_update_profile" on public.tipsters
 for update to authenticated
