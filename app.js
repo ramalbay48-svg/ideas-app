@@ -24,6 +24,26 @@ function escapeHtml(value) {
 function money(value) {
   return "TZS " + Number(value || 0).toLocaleString("en-US");
 }
+function countdownText(expiresAt) {
+  const remaining = new Date(expiresAt).getTime() - Date.now();
+  if (!Number.isFinite(remaining) || remaining <= 0) return "Expired";
+  const seconds = Math.floor(remaining / 1000);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return (days ? days + "d " : "") + String(hours).padStart(2,"0") + ":" +
+    String(minutes).padStart(2,"0") + ":" + String(secs).padStart(2,"0");
+}
+function updateSlipCountdowns() {
+  document.querySelectorAll("[data-slip-countdown]").forEach(node => {
+    const value = countdownText(node.dataset.expiresAt);
+    node.textContent = value;
+    node.classList.toggle("expired", value === "Expired");
+  });
+}
+setInterval(updateSlipCountdowns, 1000);
+
 function publicAvatar(path) {
   if (!path || !db) return "";
   return db.storage.from("ideas-public-media").getPublicUrl(path).data.publicUrl;
@@ -182,7 +202,7 @@ async function loadTipsterDetail(panel, tipster) {
     panel.innerHTML = panel.innerHTML.replace('<h3>Published betting slips</h3><p class="muted">Loading available slips…</p>', heading + '<div class="empty">This tipster has no active published slips right now.</div>');
     return;
   }
-  const cards = data.map(s => '<article class="slip-card"><div class="slip-top"><strong>' + escapeHtml(s.betting_company || "Betting company") + '</strong><span class="company">Published</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>' + escapeHtml(s.total_odds) + '</strong></div><div class="stat"><small>Valid until</small><strong>' + escapeHtml(new Date(s.expires_at).toLocaleString()) + '</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">' + money(s.price_tzs) + '<small>One-time purchase</small></div><button class="buy-button" data-buy="' + escapeHtml(s.id) + '">Buy slip</button></div></article>').join("");
+  const cards = data.map(s => '<article class="slip-card"><div class="slip-top"><strong>' + escapeHtml(s.betting_company || "Betting company") + '</strong><span class="company">Published</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>' + escapeHtml(s.total_odds) + '</strong></div><div class="stat"><small>Valid until</small><strong>' + escapeHtml(new Date(s.expires_at).toLocaleString()) + '</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="' + escapeHtml(s.expires_at) + '">Calculating…</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">' + money(s.price_tzs) + '<small>One-time purchase</small></div><button class="buy-button" data-buy="' + escapeHtml(s.id) + '">Buy slip</button></div></article>').join("");
   panel.innerHTML = panel.innerHTML.replace('<h3>Published betting slips</h3><p class="muted">Loading available slips…</p>', heading + cards);
   panel.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", () => {
     if (!currentUser) return showAuth("login");
@@ -210,7 +230,7 @@ async function loadMarketplace() {
     const profile = profiles.get(s.tipsters?.user_id);
     const name = profile?.display_name || s.tipsters?.username || "Tipster";
     const username = s.tipsters?.username || "";
-    return '<article class="slip-card"><div class="slip-top"><div class="seller"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></div><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
+    return '<article class="slip-card"><div class="slip-top"><div class="seller"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></div><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="'+escapeHtml(s.expires_at)+'">Calculating…</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
   }).join("");
   root.querySelectorAll("[data-buy]").forEach(b => b.addEventListener("click", () => {
     if (!currentUser) return showAuth("login");
