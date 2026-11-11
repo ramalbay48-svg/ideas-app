@@ -32,6 +32,8 @@ function openCheckout(slip, tipsterName = "Tipster") {
   }
   selectedSlip = slip;
   $("#checkoutForm").reset();
+  $("#checkoutForm button[type='submit']").disabled = false;
+  $("#checkoutForm button[type='submit']").textContent = "Continue to payment preview";
   $("#checkoutSummary").innerHTML =
     "<strong>" + escapeHtml(slip.betting_company || "Betslip") + " · " + escapeHtml(tipsterName) + "</strong>" +
     "<small>Total odds: " + escapeHtml(slip.total_odds) + " · Valid until: " +
