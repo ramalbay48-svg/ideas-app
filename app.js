@@ -59,13 +59,35 @@ $("#checkoutForm").addEventListener("submit", event => {
   if (!provider || !/^[67][0-9]{8}$/.test(phone)) {
     return toast("Choose a payment method and enter a valid Tanzanian number.");
   }
-  $("#unlockPreview").innerHTML =
-    "<strong>Checkout details saved for review — payment is not active yet</strong>" +
-    "<p>You selected " + escapeHtml(provider) + " for +255 " + escapeHtml(phone) +
-    ". Selcom API access is still being arranged. No payment request has been sent, no money has been charged, and this betslip remains locked.</p>";
-  $("#unlockPreview").hidden = false;
-  $("#checkoutForm button[type='submit']").textContent = "Payment gateway not connected";
-  $("#checkoutForm button[type='submit']").disabled = true;
+  const submitButton = $("#checkoutForm button[type='submit']");
+  submitButton.disabled = true;
+  submitButton.textContent = "Saving purchase…";
+  try {
+    const {data, error} = await db.rpc("create_checkout_purchase", {
+      p_slip_id: selectedSlip.id,
+      p_provider: provider,
+      p_phone: "+255" + phone
+    });
+    if (error) throw error;
+    if (!data?.purchase_id) throw new Error("The server did not confirm the purchase record.");
+    const alreadyPaid = data.status === "paid";
+    $("#unlockPreview").innerHTML =
+      "<strong>" + (alreadyPaid ? "This betslip is already purchased" : "Purchase saved — awaiting payment") + "</strong>" +
+      "<p>" + escapeHtml(provider) + " · +255 " + escapeHtml(phone) +
+      ". " + (alreadyPaid
+        ? "Your payment is already recorded. Open My Slips to view the purchase status."
+        : "Your purchase is now listed in My Slips as pending. No payment request has been sent and no money has been charged. The betslip remains locked until a payment provider confirms payment securely.") + "</p>";
+    $("#unlockPreview").hidden = false;
+    submitButton.textContent = alreadyPaid ? "Already purchased" : "Saved — payment not connected";
+    if (!alreadyPaid) toast("Purchase saved. You can find it under My Slips.");
+  } catch (error) {
+    console.error("Create checkout purchase:", error);
+    toast(error.message?.includes("create_checkout_purchase")
+      ? "Purchase saving is not set up yet. Please contact support."
+      : (error.message || "Could not save this purchase. Please try again."));
+    submitButton.disabled = false;
+    submitButton.textContent = "Try saving purchase again";
+  }
 });
 function countdownText(expiresAt) {
   const remaining = new Date(expiresAt).getTime() - Date.now();
