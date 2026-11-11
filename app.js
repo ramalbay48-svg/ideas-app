@@ -24,6 +24,49 @@ function escapeHtml(value) {
 function money(value) {
   return "TZS " + Number(value || 0).toLocaleString("en-US");
 }
+function openCheckout(slip, tipsterName = "Tipster") {
+  if (!currentUser) return showAuth("login");
+  if (!slip?.id || countdownText(slip.expires_at) === "Expired") {
+    toast("This betslip has expired and cannot be purchased.");
+    return;
+  }
+  selectedSlip = slip;
+  $("#checkoutForm").reset();
+  $("#checkoutForm button[type='submit']").disabled = false;
+  $("#checkoutForm button[type='submit']").textContent = "Continue to payment preview";
+  $("#checkoutSummary").innerHTML =
+    "<strong>" + escapeHtml(slip.betting_company || "Betslip") + " · " + escapeHtml(tipsterName) + "</strong>" +
+    "<small>Total odds: " + escapeHtml(slip.total_odds) + " · Valid until: " +
+    escapeHtml(new Date(slip.expires_at).toLocaleString()) + "</small>";
+  $("#checkoutTotal").textContent = money(slip.price_tzs);
+  $("#unlockPreview").hidden = true;
+  $("#checkoutModal").showModal();
+}
+$("#checkoutClose").addEventListener("click", () => {
+  $("#checkoutModal").close();
+  selectedSlip = null;
+});
+$("#checkoutForm").addEventListener("submit", event => {
+  event.preventDefault();
+  if (!selectedSlip) return toast("Please choose a betslip again.");
+  if (countdownText(selectedSlip.expires_at) === "Expired") {
+    $("#checkoutModal").close();
+    selectedSlip = null;
+    return toast("This betslip has expired.");
+  }
+  const provider = $("#paymentMethod").value;
+  const phone = $("#paymentPhone").value.trim();
+  if (!provider || !/^[67][0-9]{8}$/.test(phone)) {
+    return toast("Choose a payment method and enter a valid Tanzanian number.");
+  }
+  $("#unlockPreview").innerHTML =
+    "<strong>Checkout details saved for review — payment is not active yet</strong>" +
+    "<p>You selected " + escapeHtml(provider) + " for +255 " + escapeHtml(phone) +
+    ". Selcom API access is still being arranged. No payment request has been sent, no money has been charged, and this betslip remains locked.</p>";
+  $("#unlockPreview").hidden = false;
+  $("#checkoutForm button[type='submit']").textContent = "Payment gateway not connected";
+  $("#checkoutForm button[type='submit']").disabled = true;
+});
 function countdownText(expiresAt) {
   const remaining = new Date(expiresAt).getTime() - Date.now();
   if (!Number.isFinite(remaining) || remaining <= 0) return "Expired";
@@ -206,7 +249,8 @@ async function loadTipsterDetail(panel, tipster) {
   panel.innerHTML = panel.innerHTML.replace('<h3>Published betting slips</h3><p class="muted">Loading available slips…</p>', heading + cards);
   panel.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", () => {
     if (!currentUser) return showAuth("login");
-    toast("Secure checkout is not enabled yet. No payment has been taken.");
+    const slip = data.find(item => item.id === button.dataset.buy);
+    if (slip) openCheckout(slip, tipster.username || "Tipster");
   }));
 }
 async function loadMarketplace() {
@@ -234,7 +278,8 @@ async function loadMarketplace() {
   }).join("");
   root.querySelectorAll("[data-buy]").forEach(b => b.addEventListener("click", () => {
     if (!currentUser) return showAuth("login");
-    toast("Secure checkout is not enabled yet. No payment has been taken.");
+    const slip = rows.find(item => item.id === b.dataset.buy);
+    if (slip) openCheckout(slip, slip.tipsters?.username || "Tipster");
   }));
 }
 async function loadPurchasesPage(panel) {
