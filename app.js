@@ -302,7 +302,7 @@ async function loadTipstersPage(panel) {
     });
   });
 }
-async async function loadTipsterDetail(panel, tipster) {
+async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
   const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
   panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-results-wrap"><strong class="tipster-results-title">Recent results</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div></div><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
