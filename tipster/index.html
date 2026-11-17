@@ -31,7 +31,19 @@
 <label for="company">Betting company</label><select id="company" required><option value="">Choose company</option><option>SportPesa</option><option>Betika</option><option>BetPawa</option><option>Meridianbet</option><option>Other</option></select>
 <label for="expiry">Expiry date and time</label><input id="expiry" type="datetime-local" required>
 <label for="image">Betslip picture (JPG, PNG or WebP, max 5 MB)</label><input id="image" type="file" accept="image/jpeg,image/png,image/webp" required>
-<button class="primary" id="uploadButton">Upload private draft</button></form><p class="hint" id="slipStatus"></p><div class="subheading">Your drafts and listings</div><div class="records" id="mySlips">Loading…</div></section>
+<button class="primary" id="uploadButton">Upload private draft</button></form><p class="hint" id="slipStatus"></p><div class="subheading">Your drafts and listings</div><div class="records" id="mySlips">Loading…</div>
+<div class="subheading">Report a settled result</div>
+<p class="muted">Choose a completed published slip, select WON or LOST, and upload a screenshot from your betting company showing the settled result. Your report stays private until an administrator verifies it.</p>
+<form id="resultSubmitForm" class="hidden">
+<label for="resultSlip">Completed betslip</label><select id="resultSlip" required></select>
+<label for="submittedResult">Result</label><select id="submittedResult" required><option value="won">Won</option><option value="lost">Lost</option></select>
+<label for="resultEvidence">Proof screenshot (JPG, PNG or WebP, max 5 MB)</label><input id="resultEvidence" type="file" accept="image/jpeg,image/png,image/webp" required>
+<label for="resultNote">Note (optional)</label><textarea id="resultNote" maxlength="500" rows="2" placeholder="Add any useful details for the administrator"></textarea>
+<button class="primary" id="resultSubmitButton">Submit result for admin review</button>
+</form>
+<p class="hint" id="resultSubmitStatus"></p>
+<div class="subheading">Your result reports</div><div class="records" id="myResults">Loading…</div>
+</section>
 <p class="error" id="workspaceError" role="alert"></p>
 </section><footer>IDEAS APP · TIPSTER · <span>Approval required before publishing</span></footer>
 </main>
