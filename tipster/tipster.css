@@ -17,3 +17,10 @@ input,textarea,select,.phone,.quiet,.record{background:#f5f8f6;color:var(--text)
 .status,.role-notice{background:#fff;border-color:var(--line)}
 .quiet{background:#edf4ef}
 footer{color:#65736a}
+
+/* Tipster workspace: separate task pages */
+.tipster-shortcuts{display:flex;gap:8px;overflow-x:auto;position:sticky;top:68px;z-index:6;background:#f5f8f6;padding:10px 2px 14px;margin:0 0 12px}
+.tipster-shortcuts button{flex:0 0 auto;border:1px solid #cfe2d5;border-radius:999px;background:#fff;color:#087a43;padding:11px 15px;font:700 12px system-ui;white-space:nowrap}
+.tipster-shortcuts button.active{background:#008f4c;color:#fff;border-color:#008f4c}
+.tipster-task{display:none!important;margin:12px 0}
+.tipster-task.section-active{display:block!important}
