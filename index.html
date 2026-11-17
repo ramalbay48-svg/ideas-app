@@ -35,11 +35,16 @@
     </section>
 
     <section class="section">
-      <div class="section-heading">
-        <div><p class="eyebrow">DISCOVER</p><h2>Featured tipsters</h2></div>
-        <button class="text-button" data-view="tipsters">See all</button>
-      </div>
+      <div class="section-heading"><div><p class="eyebrow">DISCOVER</p><h2>Trending Tipsters</h2></div><button class="text-button" data-view="following">Following</button></div>
+      <button class="trending-card" data-view="tipsters"><div class="trending-avatars"><span>I</span><span>D</span><span>+</span></div><div><strong>Find tipsters worth following</strong><small>Explore approved tipster profiles and their verified track records.</small></div><b>›</b></button>
+    </section>
+    <section class="section">
+      <div class="section-heading"><div><p class="eyebrow">COMMUNITY</p><h2>Top Tipsters</h2></div><button class="text-button" data-view="tipsters">See all</button></div>
       <div class="tipster-row" id="tipsters"></div>
+    </section>
+    <section class="section">
+      <div class="section-heading"><div><p class="eyebrow">DISCOVER MORE</p><h2>Tipsters to follow</h2></div></div>
+      <div class="tipster-row" id="followSuggestions"></div>
     </section>
 
     <section class="section verified-results-section">
@@ -50,12 +55,12 @@
       <div class="verified-results-list" id="verifiedResults"><div class="empty">Loading verified results…</div></div>
     </section>
 
-    <section class="section">
+    <section class="section marketplace-section" id="marketplaceSection" hidden>
       <div class="section-heading">
-        <div><p class="eyebrow">MARKETPLACE</p><h2>Available betslips</h2></div>
+        <div><p class="eyebrow">MARKETPLACE</p><h2>Betslips</h2></div>
         <span class="demo-label">DEMO PREVIEW</span>
       </div>
-      <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Search tipster name or username" autocomplete="off"></label>
+      <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Search for a tipster" autocomplete="off"></label>
       <div class="filters" role="group" aria-label="Filter by betting company">
         <button class="filter active" data-company="All">All</button>
         <button class="filter" data-company="SportPesa">SportPesa</button>
@@ -74,8 +79,8 @@
 
   <nav class="bottom-nav" aria-label="Main navigation">
     <button class="nav-item selected" data-view="home"><span>⌂</span>Home</button>
-    <button class="nav-item" data-view="tipsters"><span>♙</span>Tipsters</button>
-    <button class="nav-item" data-view="betslips"><span>▤</span>My slips</button>
+    <button class="nav-item" data-view="betslips"><span>▤</span>Betslips</button>
+    <button class="nav-item" data-view="following"><span>♡</span>Following</button>
     <button class="nav-item" data-view="profile"><span>◉</span>Profile</button>
   </nav>
 
