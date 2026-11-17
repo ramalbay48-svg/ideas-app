@@ -96,10 +96,14 @@
 
   async function loadApplications() {
     $("applicationList").textContent = "Loading applications…";
-    const {data,error:e} = await client.from("tipsters").select("id,user_id,username,bio,status,created_at,profiles(display_name,phone)").order("created_at",{ascending:false});
+    const {data,error:e} = await client.from("tipsters").select("id,user_id,username,bio,status,created_at").order("created_at",{ascending:false});
     if (e) throw e;
     if (!data?.length) { $("applicationList").textContent = "No tipster applications yet."; return; }
-    $("applicationList").innerHTML = data.map(t => '<article class="record"><div class="record-head"><div><strong>@'+esc(t.username)+'</strong><small>'+esc(t.profiles?.display_name || "Applicant")+' · '+esc(t.profiles?.phone || "")+'</small></div><span class="tag">'+esc(t.status)+'</span></div><p class="muted">'+esc(t.bio || "No bio provided")+'</p>'+(t.status === "pending" ? '<div class="record-actions"><button class="approve" data-approve="'+t.id+'">Approve</button><button class="reject" data-reject="'+t.id+'">Reject</button></div>' : '')+'</article>').join("");
+    const userIds = [...new Set(data.map(t => t.user_id).filter(Boolean))];
+    const {data:profiles,error:profileError} = await client.from("profiles").select("id,display_name,phone").in("id",userIds);
+    if (profileError) throw profileError;
+    const profileById = new Map((profiles || []).map(p => [p.id,p]));
+    $("applicationList").innerHTML = data.map(t => { const p=profileById.get(t.user_id)||{}; return '<article class="record"><div class="record-head"><div><strong>@'+esc(t.username)+'</strong><small>'+esc(p.display_name || "Applicant")+' · '+esc(p.phone || "")+'</small></div><span class="tag">'+esc(t.status)+'</span></div><p class="muted">'+esc(t.bio || "No bio provided")+'</p>'+(t.status === "pending" ? '<div class="record-actions"><button class="approve" data-approve="'+t.id+'">Approve</button><button class="reject" data-reject="'+t.id+'">Reject</button></div>' : '')+'</article>'; }).join("");
     $("applicationList").querySelectorAll("[data-approve]").forEach(b => b.addEventListener("click", () => reviewTipster(b.dataset.approve,"approved")));
     $("applicationList").querySelectorAll("[data-reject]").forEach(b => b.addEventListener("click", () => reviewTipster(b.dataset.reject,"rejected")));
   }
@@ -149,10 +153,14 @@
 
   async function loadManagedTipsters() {
     const root = $("managedTipsters");
-    const {data,error:e} = await client.from("tipsters").select("id,user_id,username,bio,status,profiles(display_name,phone)").order("created_at",{ascending:false});
+    const {data,error:e} = await client.from("tipsters").select("id,user_id,username,bio,status").order("created_at",{ascending:false});
     if (e) { root.textContent = "Could not load tipsters: " + e.message; return; }
     if (!data?.length) { root.textContent = "No tipsters found."; return; }
-    root.innerHTML = data.map(t => '<article class="record"><div class="record-head"><strong>@'+esc(t.username)+'</strong><span class="tag">'+esc(t.status)+'</span></div><small>'+esc(t.profiles?.display_name||"")+' · '+esc(t.profiles?.phone||"")+'</small><label>Display name</label><input data-display="'+t.id+'" value="'+esc(t.profiles?.display_name||"")+'" maxlength="60"><label>Username</label><input data-username="'+t.id+'" value="'+esc(t.username)+'" maxlength="24"><label>Description</label><textarea data-bio="'+t.id+'" rows="2" maxlength="240">'+esc(t.bio||"")+'</textarea><div class="record-actions"><button class="approve" data-save-tipster="'+t.id+'">Save changes</button><button class="reject" data-remove-tipster="'+t.id+'">Remove tipster</button></div></article>').join("");
+    const userIds = [...new Set(data.map(t => t.user_id).filter(Boolean))];
+    const {data:profiles,error:profileError} = await client.from("profiles").select("id,display_name,phone").in("id",userIds);
+    if (profileError) { root.textContent = "Could not load profile details: " + profileError.message; return; }
+    const profileById = new Map((profiles || []).map(p => [p.id,p]));
+    root.innerHTML = data.map(t => { const p=profileById.get(t.user_id)||{}; return '<article class="record"><div class="record-head"><strong>@'+esc(t.username)+'</strong><span class="tag">'+esc(t.status)+'</span></div><small>'+esc(p.display_name||"")+' · '+esc(p.phone||"")+'</small><label>Display name</label><input data-display="'+t.id+'" value="'+esc(p.display_name||"")+'" maxlength="60"><label>Username</label><input data-username="'+t.id+'" value="'+esc(t.username)+'" maxlength="24"><label>Description</label><textarea data-bio="'+t.id+'" rows="2" maxlength="240">'+esc(t.bio||"")+'</textarea><div class="record-actions"><button class="approve" data-save-tipster="'+t.id+'">Save changes</button><button class="reject" data-remove-tipster="'+t.id+'">Remove tipster</button></div></article>'; }).join("");
     root.querySelectorAll("[data-save-tipster]").forEach(b=>b.addEventListener("click",()=>saveTipster(b.dataset.saveTipster)));
     root.querySelectorAll("[data-remove-tipster]").forEach(b=>b.addEventListener("click",()=>removeTipster(b.dataset.removeTipster)));
   }
