@@ -84,6 +84,7 @@ create table if not exists public.result_submissions (
   reviewed_by uuid references public.profiles(id),
   reviewed_at timestamptz,
   review_reason text,
+  evidence_path text,
   created_at timestamptz not null default now()
 );
 
@@ -119,6 +120,8 @@ create index if not exists betslips_tipster_idx on public.betslips(tipster_id, c
 create index if not exists purchases_customer_idx on public.purchases(customer_id, created_at desc);
 create index if not exists payments_purchase_idx on public.payment_transactions(purchase_id, created_at desc);
 create index if not exists results_status_idx on public.result_submissions(status, created_at);
+create unique index if not exists result_submissions_one_active_per_slip
+  on public.result_submissions (slip_id) where status in ('pending','approved');
 
 create or replace function public.is_ideas_admin()
 returns boolean
@@ -262,8 +265,12 @@ drop policy if exists "ideas_results_tipster_submit" on public.result_submission
 create policy "ideas_results_tipster_submit" on public.result_submissions
 for insert to authenticated with check (
   submitted_by=auth.uid()
+  and status='pending'
+  and evidence_path is not null
+  and (storage.foldername(evidence_path))[1]=auth.uid()::text
   and exists (select 1 from public.tipsters t join public.betslips b on b.tipster_id=t.id
-              where b.id=slip_id and t.user_id=auth.uid())
+              where b.id=slip_id and t.user_id=auth.uid() and t.status='approved'
+                and b.status in ('published','expired') and b.expires_at<=now())
 );
 drop policy if exists "ideas_results_admin_review" on public.result_submissions;
 create policy "ideas_results_admin_review" on public.result_submissions
@@ -297,7 +304,7 @@ grant select on public.profiles, public.slip_assets, public.purchases, public.pa
 grant insert, update on public.betslips to authenticated;
 grant insert on public.slip_assets to authenticated;
 grant insert on public.result_submissions to authenticated;
-grant update on public.result_submissions to authenticated;
+revoke update, delete on public.result_submissions from anon, authenticated;
 grant insert on public.tipsters to authenticated;
 grant update on public.tipsters to authenticated;
 grant update (display_name, avatar_path, phone, updated_at) on public.profiles to authenticated;
