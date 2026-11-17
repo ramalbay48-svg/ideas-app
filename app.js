@@ -144,6 +144,19 @@ function showPage(page, skipTipsterListLoad = false) {
   window.scrollTo({top:0, behavior:"smooth"});
 }
 document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => showPage(button.dataset.view)));
+document.addEventListener("click", async event => {
+  const button = event.target.closest("[data-open-tipster]");
+  if (!button) return;
+  const tipsterId = button.dataset.openTipster;
+  if (!tipsterId) return;
+  const panel = $("#appPagePanel");
+  if (!panel) return;
+  const rows = await getApprovedTipsters();
+  const selected = rows.find(t => t.id === tipsterId);
+  if (!selected) return toast("This tipster profile is unavailable.");
+  showPage("tipsters", true);
+  await loadTipsterDetail($("#appPagePanel"), selected);
+});
 document.querySelectorAll(".filter").forEach(button => button.addEventListener("click", () => {
   document.querySelectorAll(".filter").forEach(b => b.classList.toggle("active", b === button));
   activeCompany = button.dataset.company;
@@ -309,7 +322,7 @@ async function loadHomeTipsters() {
   root.innerHTML=rows.slice(0,6).map(tipsterCard).join("");
   suggestions.innerHTML=rows.filter(t=>!t.is_following).slice(0,6).map(tipsterCard).join("") || '<div class="empty">You are following all currently listed tipsters.</div>';
   [root,suggestions].forEach(wireFollowButtons);
-  [root,suggestions].forEach(container=>container.querySelectorAll("[data-open-tipster]").forEach(button=>button.addEventListener("click",()=>{const t=rows.find(x=>x.id===button.dataset.openTipster);if(t){showPage("tipsters",true);loadTipsterDetail($("#appPagePanel"),t);}})));
+
 }
 async function loadFollowingPage(panel) {
   panel.innerHTML='<p class="eyebrow">YOUR PICKS</p><h2>Following</h2><p class="muted">Tipsters you follow.</p><div class="tipster-row" id="followingList"><div class="empty">Loading…</div></div>';
@@ -333,12 +346,7 @@ async function loadTipstersPage(panel) {
   const rows = data.map(t => ({...t, profiles: profiles.get(t.user_id) || null, followers_count: stats.counts.get(t.id) || 0, is_following: stats.followed.has(t.id)}));
   panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + rows.map(t => '<article class="tipster"><div class="tipster-avatar">'+(t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(t.profiles?.display_name||t.username)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase()))+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<p class="muted">'+escapeHtml(t.bio||"")+'</p><button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>').join("") + '</div>';
   wireFollowButtons(panel);
-  panel.querySelectorAll("[data-open-tipster]").forEach(button => {
-    button.addEventListener("click", () => {
-      const selected = rows.find(t => t.id === button.dataset.openTipster);
-      if (selected) loadTipsterDetail(panel, selected);
-    });
-  });
+
 }
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
@@ -406,7 +414,7 @@ async function loadMarketplace() {
     const profile = profiles.get(s.tipsters?.user_id);
     const name = profile?.display_name || s.tipsters?.username || "Tipster";
     const username = s.tipsters?.username || "";
-    return '<article class="slip-card"><div class="slip-top"><div class="seller"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></div><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="'+escapeHtml(s.expires_at)+'">Calculating…</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
+    return '<article class="slip-card"><div class="slip-top"><button type="button" class="seller tipster-profile-link" data-open-tipster="'+escapeHtml(s.tipsters?.id)+'"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></button><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="'+escapeHtml(s.expires_at)+'">Calculating…</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
   }).join("");
   root.querySelectorAll("[data-buy]").forEach(b => b.addEventListener("click", () => {
     if (!currentUser) return showAuth("login");
