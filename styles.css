@@ -37,3 +37,10 @@ button,input{font:inherit}.topbar{height:66px;padding:0 max(20px,calc((100% - 90
 
 /* Compact Keka-style verified results under each tipster name */
 .tipster-results-wrap{margin:13px 0 15px}.tipster-results-title{display:block;font-size:11px;color:var(--muted);font-weight:750;margin-bottom:7px}.tipster-results{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.tipster-result-row{width:18px;height:18px;display:grid;place-items:center}.tipster-result-dot{width:12px;height:12px;border-radius:50%;display:block;background:#00E676;box-shadow:0 0 0 3px #00E67622}.tipster-result-row.lost .tipster-result-dot{background:#ff4d4d;box-shadow:0 0 0 3px #ff4d4d22}
+
+
+/* Public tipster follower counts and profile follow action */
+.follower-count{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.tipster-profile-follow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:11px 13px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.tipster-profile-follow>strong{font-size:13px}
+.follow-button[aria-pressed="true"]{background:#202820;color:#b9f5ce;border-color:#28643e}
