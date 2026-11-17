@@ -272,7 +272,15 @@ async function toggleTipsterFollow(tipsterId) {
   toast(existing ? "Tipster removed from Following." : "You are now following this tipster.");
   await loadHomeTipsters();
   const panel = $("#appPagePanel");
-  if (panel && /YOUR PICKS|Following/i.test(panel.textContent || "")) await loadFollowingPage(panel);
+  if (panel && /YOUR PICKS|Following/i.test(panel.textContent || "")) {
+    await loadFollowingPage(panel);
+  } else if (panel && /TIPSTER PROFILE/.test(panel.textContent || "")) {
+    const updatedRows = await getApprovedTipsters();
+    const updatedTipster = updatedRows.find(item => item.id === tipsterId);
+    if (updatedTipster) await loadTipsterDetail(panel, updatedTipster);
+  } else if (panel && /DISCOVER/.test(panel.textContent || "")) {
+    await loadTipstersPage(panel);
+  }
 }
 function followButton(tipsterId, isFollowing = false) {
   return '<button type="button" class="follow-button" data-follow="' + escapeHtml(tipsterId) + '" aria-pressed="' + isFollowing + '">' + (isFollowing ? 'Following' : '+ Follow') + '</button>';
