@@ -124,7 +124,7 @@ async function getPublicTipsterProfiles(userIds) {
   }
   return new Map((data || []).map(profile => [profile.user_id, profile]));
 }
-function showPage(page) {
+function showPage(page, skipTipsterListLoad = false) {
   const homeSections = [".welcome", ".banner", ".section:not(#marketplaceSection)", ".notice"];
   homeSections.forEach(selector => document.querySelectorAll(selector).forEach(el => el.hidden = page !== "home"));
   const marketplace = $("#marketplaceSection");
@@ -138,7 +138,7 @@ function showPage(page) {
   }
   panel.hidden = page === "home";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("selected", b.dataset.view === page));
-  if (page === "tipsters") loadTipstersPage(panel);
+  if (page === "tipsters" && !skipTipsterListLoad) loadTipstersPage(panel);
   if (page === "following") loadFollowingPage(panel);
   if (page === "profile") loadProfilePage(panel);
   window.scrollTo({top:0, behavior:"smooth"});
@@ -278,7 +278,7 @@ async function loadHomeTipsters() {
   root.innerHTML=rows.slice(0,6).map(tipsterCard).join("");
   suggestions.innerHTML=rows.filter(t=>!followedTipsterIds().includes(t.id)).slice(0,6).map(tipsterCard).join("") || '<div class="empty">You are following all currently listed tipsters.</div>';
   [root,suggestions].forEach(wireFollowButtons);
-  [root,suggestions].forEach(container=>container.querySelectorAll("[data-open-tipster]").forEach(button=>button.addEventListener("click",()=>{const t=rows.find(x=>x.id===button.dataset.openTipster);if(t)loadTipsterDetail($("#appPagePanel"),t);})));
+  [root,suggestions].forEach(container=>container.querySelectorAll("[data-open-tipster]").forEach(button=>button.addEventListener("click",()=>{const t=rows.find(x=>x.id===button.dataset.openTipster);if(t){showPage("tipsters",true);loadTipsterDetail($("#appPagePanel"),t);}})));
 }
 async function loadFollowingPage(panel) {
   panel.innerHTML='<p class="eyebrow">YOUR PICKS</p><h2>Following</h2><p class="muted">Tipsters you choose to follow on this device.</p><div class="tipster-row" id="followingList"><div class="empty">Loading…</div></div>';
