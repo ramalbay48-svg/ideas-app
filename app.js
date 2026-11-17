@@ -235,6 +235,41 @@ function updateAccountControls() {
   $("#adminOpen").hidden = true;
 }
 
+async function loadFeaturedTipsters() {
+  const root = $("#tipsters");
+  if (!root || !db) return;
+  root.innerHTML = '<div class="empty">Finding featured tipsters…</div>';
+  const {data, error} = await db.from("tipsters")
+    .select("id,user_id,username,bio").eq("status","approved")
+    .order("created_at",{ascending:false}).limit(6);
+  if (error) {
+    console.warn("Featured tipsters:", error.message);
+    root.innerHTML = '<div class="empty">Featured tipsters are temporarily unavailable.</div>';
+    return;
+  }
+  if (!data?.length) {
+    root.innerHTML = '<div class="empty">New tipster profiles will appear here when approved.</div>';
+    return;
+  }
+  const profiles = await getPublicTipsterProfiles(data.map(t => t.user_id));
+  root.innerHTML = data.map(t => {
+    const profile = profiles.get(t.user_id);
+    const name = profile?.display_name || t.username || "Tipster";
+    const avatar = profile?.avatar_path
+      ? '<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'">'
+      : '<span>'+escapeHtml(name.charAt(0).toUpperCase())+'</span>';
+    return '<button type="button" class="featured-tipster" data-featured-tipster="'+escapeHtml(t.id)+'"><span class="featured-avatar">'+avatar+'</span><span class="featured-copy"><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(t.username)+'</small><span class="featured-bio">'+escapeHtml(t.bio || "View profile and published selections")+'</span></span><span class="featured-arrow">›</span></button>';
+  }).join("");
+  root.querySelectorAll("[data-featured-tipster]").forEach(button => {
+    button.addEventListener("click", () => {
+      const selected = data.find(t => t.id === button.dataset.featuredTipster);
+      if (!selected) return;
+      showPage("tipsters");
+      const panel = $("#appPagePanel");
+      if (panel) loadTipsterDetail(panel, {...selected, profiles: profiles.get(selected.user_id) || null});
+    });
+  });
+}
 async function loadTipstersPage(panel) {
   panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><p class="muted">Loading tipsters…</p>';
   if (!db) return;
@@ -254,11 +289,22 @@ async function loadTipstersPage(panel) {
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
   const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
-  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Verified results</h3><div id="tipsterVerifiedResults"><div class="empty">Loading verified results…</div></div><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
+  const avatar = tipster.profiles?.avatar_path
+    ? '<img alt="Profile picture of '+escapeHtml(displayName)+'" src="'+escapeHtml(publicAvatar(tipster.profiles.avatar_path))+'">'
+    : '<span>'+escapeHtml(displayName.charAt(0).toUpperCase())+'</span>';
+  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><section class="tipster-profile-hero"><div class="tipster-profile-cover"></div><div class="tipster-profile-identity"><div class="tipster-profile-avatar">'+avatar+'</div><div><p class="eyebrow">TIPSTER PROFILE</p><h2>'+escapeHtml(displayName)+'</h2><p class="muted">@'+escapeHtml(tipster.username)+'</p></div></div><p class="tipster-profile-bio">'+escapeHtml(tipster.bio || "No profile description yet.")+'</p><div class="tipster-profile-metrics"><div><strong id="profileWinRate">—</strong><small>Verified win rate</small></div><div><strong id="profileWins">—</strong><small>Verified wins</small></div><div><strong id="profileSettled">—</strong><small>Settled slips</small></div></div></section><h3 class="profile-section-title">Recent verified results</h3><div id="tipsterVerifiedResults"><div class="empty">Loading verified results…</div></div><h3 class="profile-section-title">Available betting slips</h3><p class="muted">Loading available slips…</p>';
   $("#backToTipsters").addEventListener("click", () => loadTipstersPage(panel));
   const {data: verifiedRows, error: verifiedError} = await db.from("public_verified_results")
     .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
     .eq("tipster_id", tipster.id).order("reviewed_at", {ascending:false}).limit(30);
+  const settled = verifiedRows || [];
+  const wins = settled.filter(result => result.submitted_result === "won").length;
+  const losses = settled.filter(result => result.submitted_result === "lost").length;
+  const settledCount = wins + losses;
+  const winRate = settledCount ? Math.round((wins / settledCount) * 100) + "%" : "—";
+  $("#profileWinRate").textContent = winRate;
+  $("#profileWins").textContent = String(wins);
+  $("#profileSettled").textContent = String(settledCount);
   const verifiedRoot = $("#tipsterVerifiedResults");
   if (verifiedRoot) {
     if (verifiedError) {
@@ -461,6 +507,7 @@ async function initialize() {
     else { currentUser=null; currentProfile=null; updateAccountControls(); }
   });
   await loadMarketplace();
+  await loadFeaturedTipsters();
   await loadVerifiedResults();
   const {data:news} = await db.from("announcements").select("title,message,image_url").eq("active",true).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if (news) { const banner=$(".banner"); if (banner) { banner.querySelector("h2").textContent=news.title; banner.querySelector("p").textContent=news.message; if(news.image_url){banner.style.backgroundImage="linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.18)),url("+JSON.stringify(news.image_url)+")";banner.style.backgroundSize="cover";banner.style.backgroundPosition="center";} } }
