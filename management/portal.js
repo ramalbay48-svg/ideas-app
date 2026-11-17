@@ -46,6 +46,29 @@
     await renderAdminTools();
     await loadResultSubmissions();
     await loadAuditLogs();
+    addAdminShortcuts();
+  }
+
+  function addAdminShortcuts() {
+    if ($("adminShortcuts")) return;
+    const nav = document.createElement("nav");
+    nav.id = "adminShortcuts";
+    nav.className = "admin-shortcuts";
+    nav.setAttribute("aria-label", "Admin dashboard sections");
+    const links = [
+      ["Approve Tipsters", "adminPanel"],
+      ["Verify Results", "resultsPanel"],
+      ["Activity Log", "auditPanel"],
+      ["Manage Profiles", "managedTipsters"],
+      ["Top & Trending", "topWinningTipsters"],
+      ["Create Banner", "bannerSection"]
+    ];
+    nav.innerHTML = links.map(([label,target]) => '<button type="button" data-target="' + target + '">' + label + '</button>').join("");
+    $("roleNotice").insertAdjacentElement("afterend", nav);
+    nav.querySelectorAll("button[data-target]").forEach(button => button.addEventListener("click", () => {
+      const target = $(button.dataset.target);
+      if (target) target.scrollIntoView({behavior:"smooth",block:"start"});
+    }));
   }
 
   async function checkApplication() {
@@ -102,7 +125,7 @@
       tools.className = "panel";
       $("adminPanel").appendChild(tools);
     }
-    tools.innerHTML = '<div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div><div class="subheading">Tipster performance</div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div><div class="subheading">Customer app banners</div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div>';
+    tools.innerHTML = '<div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div><div class="subheading">Tipster performance</div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div><div class="subheading" id="bannerSection">Customer app banners</div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div>';
     await loadManagedTipsters();
     await loadTipsterLeaderboards();
     await loadBanners();
