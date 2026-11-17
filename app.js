@@ -124,9 +124,11 @@ async function getPublicTipsterProfiles(userIds) {
   }
   return new Map((data || []).map(profile => [profile.user_id, profile]));
 }
-function showPage(page) {
-  const homeSections = [".welcome", ".banner", ".section", ".notice"];
+function showPage(page, skipTipsterListLoad = false) {
+  const homeSections = [".welcome", ".banner", ".section:not(#marketplaceSection)", ".notice"];
   homeSections.forEach(selector => document.querySelectorAll(selector).forEach(el => el.hidden = page !== "home"));
+  const marketplace = $("#marketplaceSection");
+  if (marketplace) marketplace.hidden = page !== "betslips";
   let panel = $("#appPagePanel");
   if (!panel) {
     panel = document.createElement("section");
@@ -136,12 +138,25 @@ function showPage(page) {
   }
   panel.hidden = page === "home";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("selected", b.dataset.view === page));
-  if (page === "tipsters") loadTipstersPage(panel);
-  if (page === "betslips") loadPurchasesPage(panel);
+  if (page === "tipsters" && !skipTipsterListLoad) loadTipstersPage(panel);
+  if (page === "following") loadFollowingPage(panel);
   if (page === "profile") loadProfilePage(panel);
   window.scrollTo({top:0, behavior:"smooth"});
 }
 document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => showPage(button.dataset.view)));
+document.addEventListener("click", async event => {
+  const button = event.target.closest("[data-open-tipster]");
+  if (!button) return;
+  const tipsterId = button.dataset.openTipster;
+  if (!tipsterId) return;
+  const panel = $("#appPagePanel");
+  if (!panel) return;
+  const rows = await getApprovedTipsters();
+  const selected = rows.find(t => t.id === tipsterId);
+  if (!selected) return toast("This tipster profile is unavailable.");
+  showPage("tipsters", true);
+  await loadTipsterDetail($("#appPagePanel"), selected);
+});
 document.querySelectorAll(".filter").forEach(button => button.addEventListener("click", () => {
   document.querySelectorAll(".filter").forEach(b => b.classList.toggle("active", b === button));
   activeCompany = button.dataset.company;
@@ -235,6 +250,91 @@ function updateAccountControls() {
   $("#adminOpen").hidden = true;
 }
 
+async function getFollowStats(tipsterIds) {
+  const ids = [...new Set((tipsterIds || []).filter(Boolean))];
+  const counts = new Map(), followed = new Set();
+  if (!db || !ids.length) return {counts, followed};
+  const {data: countRows, error: countError} = await db.from("public_tipster_follower_counts")
+    .select("tipster_id,follower_count").in("tipster_id", ids);
+  if (countError) console.warn("Follower totals:", countError.message);
+  (countRows || []).forEach(row => counts.set(row.tipster_id, Number(row.follower_count || 0)));
+  if (currentUser) {
+    const {data: ownRows, error: ownError} = await db.from("tipster_follows")
+      .select("tipster_id").eq("follower_id", currentUser.id).in("tipster_id", ids);
+    if (ownError) console.warn("Following list:", ownError.message);
+    (ownRows || []).forEach(row => followed.add(row.tipster_id));
+  }
+  return {counts, followed};
+}
+async function toggleTipsterFollow(tipsterId) {
+  if (!currentUser) {
+    showAuth("login");
+    toast("Log in to follow this tipster.");
+    return;
+  }
+  const {data:existing, error:lookupError} = await db.from("tipster_follows")
+    .select("tipster_id").eq("tipster_id", tipsterId).eq("follower_id", currentUser.id).maybeSingle();
+  if (lookupError) return toast("Could not check your following list. Please try again.");
+  const result = existing
+    ? await db.from("tipster_follows").delete().eq("tipster_id", tipsterId).eq("follower_id", currentUser.id)
+    : await db.from("tipster_follows").insert({tipster_id:tipsterId, follower_id:currentUser.id});
+  if (result.error) {
+    console.warn("Follow update:", result.error.message);
+    return toast("Could not update your follow. Please try again.");
+  }
+  toast(existing ? "Tipster removed from Following." : "You are now following this tipster.");
+  await loadHomeTipsters();
+  const panel = $("#appPagePanel");
+  if (panel && /YOUR PICKS|Following/i.test(panel.textContent || "")) {
+    await loadFollowingPage(panel);
+  } else if (panel && /TIPSTER PROFILE/.test(panel.textContent || "")) {
+    const updatedRows = await getApprovedTipsters();
+    const updatedTipster = updatedRows.find(item => item.id === tipsterId);
+    if (updatedTipster) await loadTipsterDetail(panel, updatedTipster);
+  } else if (panel && /DISCOVER/.test(panel.textContent || "")) {
+    await loadTipstersPage(panel);
+  }
+}
+function followButton(tipsterId, isFollowing = false) {
+  return '<button type="button" class="follow-button" data-follow="' + escapeHtml(tipsterId) + '" aria-pressed="' + isFollowing + '">' + (isFollowing ? 'Following' : '+ Follow') + '</button>';
+}
+function wireFollowButtons(root) {
+  root.querySelectorAll("[data-follow]").forEach(button => button.addEventListener("click", () => toggleTipsterFollow(button.dataset.follow)));
+}
+async function getApprovedTipsters() {
+  if (!db) return [];
+  const {data,error} = await db.from("tipsters").select("id,user_id,username,bio").eq("status","approved").order("created_at",{ascending:false});
+  if (error) { console.warn("Approved tipsters:",error.message); return []; }
+  const profiles = await getPublicTipsterProfiles((data||[]).map(t=>t.user_id));
+  const stats = await getFollowStats((data||[]).map(t=>t.id));
+  return (data||[]).map(t=>({...t,profiles:profiles.get(t.user_id)||null,followers_count:stats.counts.get(t.id)||0,is_following:stats.followed.has(t.id)}));
+}
+function tipsterCard(t) {
+  const name=t.profiles?.display_name||t.username||"Tipster";
+  const avatar=t.profiles?.avatar_path?'<img alt="" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':escapeHtml(name.charAt(0).toUpperCase());
+  return '<article class="tipster"><div class="tipster-avatar">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>@'+escapeHtml(t.username)+'</small><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
+}
+async function loadHomeTipsters() {
+  const rows=await getApprovedTipsters();
+  const root=$("#tipsters"), suggestions=$("#followSuggestions");
+  if (!root || !suggestions) return;
+  if (!rows.length) {root.innerHTML='<div class="empty">Approved tipsters will appear here.</div>';suggestions.innerHTML='<div class="empty">New tipsters will appear here.</div>';return;}
+  root.innerHTML=rows.slice(0,6).map(tipsterCard).join("");
+  suggestions.innerHTML=rows.filter(t=>!t.is_following).slice(0,6).map(tipsterCard).join("") || '<div class="empty">You are following all currently listed tipsters.</div>';
+  [root,suggestions].forEach(wireFollowButtons);
+
+}
+async function loadFollowingPage(panel) {
+  panel.innerHTML='<p class="eyebrow">YOUR PICKS</p><h2>Following</h2><p class="muted">Tipsters you follow.</p><div class="tipster-row" id="followingList"><div class="empty">Loading…</div></div>';
+  if (!currentUser) {
+    panel.querySelector("#followingList").innerHTML='<div class="empty">Log in to see and manage your followed tipsters.</div><button class="primary-action" id="followingLogin">Log in</button>';
+    $("#followingLogin").onclick=()=>showAuth("login");
+    return;
+  }
+  const rows=await getApprovedTipsters(), selected=rows.filter(t=>t.is_following), root=$("#followingList");
+  if (!selected.length) {root.innerHTML='<div class="empty">You are not following anyone yet. Explore approved tipsters and tap Follow.</div><button class="primary-action" id="discoverTipsters">Discover tipsters</button>';$("#discoverTipsters").onclick=()=>showPage("tipsters");return;}
+  root.innerHTML=selected.map(tipsterCard).join("");wireFollowButtons(root);
+}
 async function loadTipstersPage(panel) {
   panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><p class="muted">Loading tipsters…</p>';
   if (!db) return;
@@ -242,20 +342,18 @@ async function loadTipstersPage(panel) {
   if (error) { panel.innerHTML = '<h2>Tipsters</h2><p class="muted">Could not load tipsters. Check database permissions.</p>'; return; }
   if (!data?.length) { panel.innerHTML = '<h2>Approved tipsters</h2><div class="empty">No approved tipsters yet. Check back soon.</div>'; return; }
   const profiles = await getPublicTipsterProfiles(data.map(t => t.user_id));
-  const rows = data.map(t => ({...t, profiles: profiles.get(t.user_id) || null}));
-  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + rows.map(t => '<article class="tipster"><div class="tipster-avatar">'+(t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(t.profiles?.display_name||t.username)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase()))+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p><button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>').join("") + '</div>';
-  panel.querySelectorAll("[data-open-tipster]").forEach(button => {
-    button.addEventListener("click", () => {
-      const selected = rows.find(t => t.id === button.dataset.openTipster);
-      if (selected) loadTipsterDetail(panel, selected);
-    });
-  });
+  const stats = await getFollowStats(data.map(t => t.id));
+  const rows = data.map(t => ({...t, profiles: profiles.get(t.user_id) || null, followers_count: stats.counts.get(t.id) || 0, is_following: stats.followed.has(t.id)}));
+  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + rows.map(t => '<article class="tipster"><div class="tipster-avatar">'+(t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(t.profiles?.display_name||t.username)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase()))+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<p class="muted">'+escapeHtml(t.bio||"")+'</p><button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>').join("") + '</div>';
+  wireFollowButtons(panel);
+
 }
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
   const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
-  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Verified results</h3><div id="tipsterVerifiedResults"><div class="empty">Loading verified results…</div></div><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
+  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-profile-follow"><strong>' + Number(tipster.followers_count||0).toLocaleString() + ' followers</strong>' + followButton(tipster.id,tipster.is_following) + '</div><div class="tipster-results-wrap"><strong class="tipster-results-title">Recent results</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div></div><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
   $("#backToTipsters").addEventListener("click", () => loadTipstersPage(panel));
+  wireFollowButtons(panel);
   const {data: verifiedRows, error: verifiedError} = await db.from("public_verified_results")
     .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
     .eq("tipster_id", tipster.id).order("reviewed_at", {ascending:false}).limit(30);
@@ -267,7 +365,7 @@ async function loadTipsterDetail(panel, tipster) {
     } else if (!verifiedRows?.length) {
       verifiedRoot.innerHTML = '<div class="empty">No administrator-verified results yet.</div>';
     } else {
-      verifiedRoot.innerHTML = verifiedRows.map(result => verifiedResultCard(result, false)).join("");
+      verifiedRoot.innerHTML = verifiedRows.slice(0,6).map(result => verifiedResultRow(result)).join("");
     }
   }
   const {data, error} = await db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at").eq("tipster_id", tipster.id).eq("status", "published").gt("expires_at", new Date().toISOString()).order("created_at", {ascending:false});
@@ -290,35 +388,9 @@ async function loadTipsterDetail(panel, tipster) {
   }));
 }
 
-function verifiedResultCard(result, showTipster = true) {
+function verifiedResultRow(result) {
   const won = result.submitted_result === "won";
-  return '<article class="verified-result-card"><div class="verified-result-head"><strong>' +
-    (showTipster ? '@' + escapeHtml(result.username || "Tipster") + ' · ' : '') +
-    escapeHtml(result.betting_company || "Betting slip") +
-    '</strong><span class="verified-result-badge ' + (won ? 'won' : 'lost') + '">' +
-    (won ? '● WIN' : '● LOSS') + '</span></div><div class="verified-result-meta">' +
-    'Odds ' + escapeHtml(result.total_odds ?? "—") +
-    (result.reviewed_at ? ' · Verified ' + escapeHtml(new Date(result.reviewed_at).toLocaleDateString()) : '') +
-    '</div><div class="verified-result-confirmation">Administrator verified</div></article>';
-}
-
-async function loadVerifiedResults() {
-  const root = $("#verifiedResults");
-  if (!root || !db) return;
-  root.innerHTML = '<div class="empty">Loading verified results…</div>';
-  const {data, error} = await db.from("public_verified_results")
-    .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
-    .order("reviewed_at", {ascending:false}).limit(8);
-  if (error) {
-    console.warn("Public verified results:", error.message);
-    root.innerHTML = '<div class="empty">Verified results are temporarily unavailable.</div>';
-    return;
-  }
-  if (!data?.length) {
-    root.innerHTML = '<div class="empty">No administrator-verified results have been published yet.</div>';
-    return;
-  }
-  root.innerHTML = data.map(result => verifiedResultCard(result, true)).join("");
+  return '<div class="tipster-result-row '+(won ? "won" : "lost")+'" aria-label="'+(won ? "Won" : "Lost")+'"><span class="tipster-result-dot" aria-hidden="true"></span></div>';
 }
 
 async function loadMarketplace() {
@@ -342,7 +414,7 @@ async function loadMarketplace() {
     const profile = profiles.get(s.tipsters?.user_id);
     const name = profile?.display_name || s.tipsters?.username || "Tipster";
     const username = s.tipsters?.username || "";
-    return '<article class="slip-card"><div class="slip-top"><div class="seller"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></div><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="'+escapeHtml(s.expires_at)+'">Calculating…</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
+    return '<article class="slip-card"><div class="slip-top"><button type="button" class="seller tipster-profile-link" data-open-tipster="'+escapeHtml(s.tipsters?.id)+'"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></button><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="'+escapeHtml(s.expires_at)+'">Calculating…</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
   }).join("");
   root.querySelectorAll("[data-buy]").forEach(b => b.addEventListener("click", () => {
     if (!currentUser) return showAuth("login");
@@ -361,7 +433,8 @@ async function loadPurchasesPage(panel) {
 async function loadProfilePage(panel) {
   if (!currentUser) { panel.innerHTML='<h2>Your profile</h2><p class="muted">Log in or create an account to manage your profile.</p><button class="primary-action" id="profileLogin">Log in / Register</button>'; $("#profileLogin").onclick=()=>showAuth("register"); return; }
   const p=currentProfile || {};
-  panel.innerHTML='<p class="eyebrow">ACCOUNT</p><h2>Your profile</h2><div class="slip-card"><strong>'+escapeHtml(p.display_name||"IDEAS APP member")+'</strong><p class="muted">'+escapeHtml(currentUser.phone||"")+'</p><p class="muted">Account type: '+escapeHtml(p.role||"customer")+'</p></div><button class="primary-action" id="logoutButton">Log out</button>';
+  panel.innerHTML='<p class="eyebrow">ACCOUNT</p><h2>Your profile</h2><div class="slip-card"><strong>'+escapeHtml(p.display_name||"IDEAS APP member")+'</strong><p class="muted">'+escapeHtml(currentUser.phone||"")+'</p><p class="muted">Account type: '+escapeHtml(p.role||"customer")+'</p></div><button class="secondary-action" id="myPurchasesButton">My purchases</button><div id="myPurchasesPanel"></div><button class="primary-action" id="logoutButton">Log out</button>';
+  $("#myPurchasesButton").onclick=()=>loadPurchasesPage($("#myPurchasesPanel"));
   $("#logoutButton").onclick=async()=>{await db.auth.signOut();currentUser=null;currentProfile=null;updateAccountControls();showPage("home");toast("Logged out.");};
 }
 $("#tipsterOpen").addEventListener("click", () => {
@@ -461,7 +534,7 @@ async function initialize() {
     else { currentUser=null; currentProfile=null; updateAccountControls(); }
   });
   await loadMarketplace();
-  await loadVerifiedResults();
+  await loadHomeTipsters();
   const {data:news} = await db.from("announcements").select("title,message,image_url").eq("active",true).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if (news) { const banner=$(".banner"); if (banner) { banner.querySelector("h2").textContent=news.title; banner.querySelector("p").textContent=news.message; if(news.image_url){banner.style.backgroundImage="linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.18)),url("+JSON.stringify(news.image_url)+")";banner.style.backgroundSize="cover";banner.style.backgroundPosition="center";} } }
   updateAccountControls();
