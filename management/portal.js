@@ -168,14 +168,23 @@
   async function loadResultSubmissions() {
     $("resultList").textContent = "Loading result submissions…";
     const {data,error:e} = await client.from("result_submissions")
-      .select("id,slip_id,submitted_by,submitted_result,note,status,created_at,review_reason,betslips(betting_company,total_odds,tipsters(username))")
+      .select("id,slip_id,submitted_by,submitted_result,note,status,created_at,review_reason,evidence_path,betslips(betting_company,total_odds,tipsters(username))")
       .order("created_at",{ascending:false}).limit(50);
     if (e) throw e;
     if (!data?.length) { $("resultList").textContent = "No result submissions yet."; return; }
-    $("resultList").innerHTML = data.map(r => {
+    const rows = await Promise.all(data.map(async r => {
+      if (!r.evidence_path) return {...r,evidenceUrl:null};
+      const {data:signed,error:signedError} = await client.storage.from("ideas-result-evidence").createSignedUrl(r.evidence_path,300);
+      if (signedError) console.warn("Result proof preview:",signedError.message);
+      return {...r,evidenceUrl:signed?.signedUrl || null};
+    }));
+    $("resultList").innerHTML = rows.map(r => {
       const slip = r.betslips || {};
       const tipsterName = slip.tipsters?.username ? "@" + slip.tipsters.username : "Tipster";
-      return '<article class="record"><div class="record-head"><div><strong>' + esc(tipsterName) + ' · ' + esc(slip.betting_company || "Betting slip") + '</strong><small>Submitted ' + esc(new Date(r.created_at).toLocaleString()) + '</small></div><span class="tag">' + esc(r.status) + '</span></div><p class="muted">Claimed result: <strong>' + esc(r.submitted_result) + '</strong>' + (slip.total_odds ? ' · Odds ' + esc(slip.total_odds) : '') + '</p>' + (r.note ? '<p class="muted">' + esc(r.note) + '</p>' : '') + (r.review_reason ? '<p class="muted">Review note: ' + esc(r.review_reason) + '</p>' : '') + (r.status === "pending" ? '<div class="record-actions"><button class="approve" data-result-approve="' + r.id + '">Confirm result</button><button class="reject" data-result-reject="' + r.id + '">Reject result</button></div>' : '') + '</article>';
+      const proof = r.evidenceUrl
+        ? '<p><a href="' + esc(r.evidenceUrl) + '" target="_blank" rel="noopener">Open proof screenshot ↗</a></p>'
+        : '<p class="muted">Proof screenshot unavailable.</p>';
+      return '<article class="record"><div class="record-head"><div><strong>' + esc(tipsterName) + ' · ' + esc(slip.betting_company || "Betting slip") + '</strong><small>Submitted ' + esc(new Date(r.created_at).toLocaleString()) + '</small></div><span class="tag">' + esc(r.status) + '</span></div><p class="muted">Claimed result: <strong>' + esc(r.submitted_result.toUpperCase()) + '</strong>' + (slip.total_odds ? ' · Odds ' + esc(slip.total_odds) : '') + '</p>' + (r.note ? '<p class="muted">' + esc(r.note) + '</p>' : '') + proof + (r.review_reason ? '<p class="muted">Review note: ' + esc(r.review_reason) + '</p>' : '') + (r.status === "pending" ? '<div class="record-actions"><button class="approve" data-result-approve="' + r.id + '">Confirm result</button><button class="reject" data-result-reject="' + r.id + '">Reject result</button></div>' : '') + '</article>';
     }).join("");
     $("resultList").querySelectorAll("[data-result-approve]").forEach(b => b.addEventListener("click", () => reviewResult(b.dataset.resultApprove,"approved")));
     $("resultList").querySelectorAll("[data-result-reject]").forEach(b => b.addEventListener("click", () => reviewResult(b.dataset.resultReject,"rejected")));
@@ -185,7 +194,7 @@
     error("");
     try {
       const {error:e} = await client.rpc("admin_review_result_submission", {
-        p_submission_id:id, p_decision:decision, p_reason:null
+        p_result_submission_id:id, p_decision:decision, p_reason:null
       });
       if (e) throw e;
       await loadResultSubmissions();
