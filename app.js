@@ -125,8 +125,10 @@ async function getPublicTipsterProfiles(userIds) {
   return new Map((data || []).map(profile => [profile.user_id, profile]));
 }
 function showPage(page) {
-  const homeSections = [".welcome", ".banner", ".section", ".notice"];
+  const homeSections = [".welcome", ".banner", ".section:not(#marketplaceSection)", ".notice"];
   homeSections.forEach(selector => document.querySelectorAll(selector).forEach(el => el.hidden = page !== "home"));
+  const marketplace = $("#marketplaceSection");
+  if (marketplace) marketplace.hidden = page !== "betslips";
   let panel = $("#appPagePanel");
   if (!panel) {
     panel = document.createElement("section");
@@ -137,7 +139,7 @@ function showPage(page) {
   panel.hidden = page === "home";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("selected", b.dataset.view === page));
   if (page === "tipsters") loadTipstersPage(panel);
-  if (page === "betslips") loadPurchasesPage(panel);
+  if (page === "following") loadFollowingPage(panel);
   if (page === "profile") loadProfilePage(panel);
   window.scrollTo({top:0, behavior:"smooth"});
 }
@@ -235,6 +237,55 @@ function updateAccountControls() {
   $("#adminOpen").hidden = true;
 }
 
+function followedTipsterIds() {
+  try { return JSON.parse(localStorage.getItem("ideas_followed_tipsters") || "[]"); } catch { return []; }
+}
+function setFollowedTipster(id, follow) {
+  const ids = followedTipsterIds().filter(value => value !== id);
+  if (follow) ids.push(id);
+  localStorage.setItem("ideas_followed_tipsters", JSON.stringify(ids));
+}
+function followButton(tipsterId) {
+  const followed = followedTipsterIds().includes(tipsterId);
+  return '<button class="follow-button" data-follow="' + escapeHtml(tipsterId) + '" aria-pressed="' + followed + '">' + (followed ? 'Following ✓' : '+ Follow') + '</button>';
+}
+function wireFollowButtons(root) {
+  root.querySelectorAll("[data-follow]").forEach(button => button.addEventListener("click", () => {
+    const id = button.dataset.follow, follow = !followedTipsterIds().includes(id);
+    setFollowedTipster(id, follow);
+    button.outerHTML = followButton(id);
+    wireFollowButtons(root);
+    toast(follow ? "Added to Following on this device." : "Removed from Following on this device.");
+  }));
+}
+async function getApprovedTipsters() {
+  if (!db) return [];
+  const {data,error} = await db.from("tipsters").select("id,user_id,username,bio").eq("status","approved").order("created_at",{ascending:false});
+  if (error) { console.warn("Approved tipsters:",error.message); return []; }
+  const profiles = await getPublicTipsterProfiles((data||[]).map(t=>t.user_id));
+  return (data||[]).map(t=>({...t,profiles:profiles.get(t.user_id)||null}));
+}
+function tipsterCard(t) {
+  const name=t.profiles?.display_name||t.username||"Tipster";
+  const avatar=t.profiles?.avatar_path?'<img alt="" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':escapeHtml(name.charAt(0).toUpperCase());
+  return '<article class="tipster"><div class="tipster-avatar">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>@'+escapeHtml(t.username)+'</small>'+followButton(t.id)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
+}
+async function loadHomeTipsters() {
+  const rows=await getApprovedTipsters();
+  const root=$("#tipsters"), suggestions=$("#followSuggestions");
+  if (!root || !suggestions) return;
+  if (!rows.length) {root.innerHTML='<div class="empty">Approved tipsters will appear here.</div>';suggestions.innerHTML='<div class="empty">New tipsters will appear here.</div>';return;}
+  root.innerHTML=rows.slice(0,6).map(tipsterCard).join("");
+  suggestions.innerHTML=rows.filter(t=>!followedTipsterIds().includes(t.id)).slice(0,6).map(tipsterCard).join("") || '<div class="empty">You are following all currently listed tipsters.</div>';
+  [root,suggestions].forEach(wireFollowButtons);
+  [root,suggestions].forEach(container=>container.querySelectorAll("[data-open-tipster]").forEach(button=>button.addEventListener("click",()=>{const t=rows.find(x=>x.id===button.dataset.openTipster);if(t)loadTipsterDetail($("#appPagePanel"),t);})));
+}
+async function loadFollowingPage(panel) {
+  panel.innerHTML='<p class="eyebrow">YOUR PICKS</p><h2>Following</h2><p class="muted">Tipsters you choose to follow on this device.</p><div class="tipster-row" id="followingList"><div class="empty">Loading…</div></div>';
+  const rows=await getApprovedTipsters(), ids=followedTipsterIds(), selected=rows.filter(t=>ids.includes(t.id)), root=$("#followingList");
+  if (!selected.length) {root.innerHTML='<div class="empty">You are not following anyone yet. Explore approved tipsters and tap Follow.</div><button class="primary-action" id="discoverTipsters">Discover tipsters</button>';$("#discoverTipsters").onclick=()=>showPage("tipsters");return;}
+  root.innerHTML=selected.map(tipsterCard).join("");wireFollowButtons(root);
+}
 async function loadTipstersPage(panel) {
   panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><p class="muted">Loading tipsters…</p>';
   if (!db) return;
@@ -361,7 +412,8 @@ async function loadPurchasesPage(panel) {
 async function loadProfilePage(panel) {
   if (!currentUser) { panel.innerHTML='<h2>Your profile</h2><p class="muted">Log in or create an account to manage your profile.</p><button class="primary-action" id="profileLogin">Log in / Register</button>'; $("#profileLogin").onclick=()=>showAuth("register"); return; }
   const p=currentProfile || {};
-  panel.innerHTML='<p class="eyebrow">ACCOUNT</p><h2>Your profile</h2><div class="slip-card"><strong>'+escapeHtml(p.display_name||"IDEAS APP member")+'</strong><p class="muted">'+escapeHtml(currentUser.phone||"")+'</p><p class="muted">Account type: '+escapeHtml(p.role||"customer")+'</p></div><button class="primary-action" id="logoutButton">Log out</button>';
+  panel.innerHTML='<p class="eyebrow">ACCOUNT</p><h2>Your profile</h2><div class="slip-card"><strong>'+escapeHtml(p.display_name||"IDEAS APP member")+'</strong><p class="muted">'+escapeHtml(currentUser.phone||"")+'</p><p class="muted">Account type: '+escapeHtml(p.role||"customer")+'</p></div><button class="secondary-action" id="myPurchasesButton">My purchases</button><div id="myPurchasesPanel"></div><button class="primary-action" id="logoutButton">Log out</button>';
+  $("#myPurchasesButton").onclick=()=>loadPurchasesPage($("#myPurchasesPanel"));
   $("#logoutButton").onclick=async()=>{await db.auth.signOut();currentUser=null;currentProfile=null;updateAccountControls();showPage("home");toast("Logged out.");};
 }
 $("#tipsterOpen").addEventListener("click", () => {
@@ -461,6 +513,7 @@ async function initialize() {
     else { currentUser=null; currentProfile=null; updateAccountControls(); }
   });
   await loadMarketplace();
+  await loadHomeTipsters();
   await loadVerifiedResults();
   const {data:news} = await db.from("announcements").select("title,message,image_url").eq("active",true).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if (news) { const banner=$(".banner"); if (banner) { banner.querySelector("h2").textContent=news.title; banner.querySelector("p").textContent=news.message; if(news.image_url){banner.style.backgroundImage="linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.18)),url("+JSON.stringify(news.image_url)+")";banner.style.backgroundSize="cover";banner.style.backgroundPosition="center";} } }
