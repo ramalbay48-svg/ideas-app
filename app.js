@@ -46,7 +46,7 @@ $("#checkoutClose").addEventListener("click", () => {
   $("#checkoutModal").close();
   selectedSlip = null;
 });
-$("#checkoutForm").addEventListener("submit", event => {
+$("#checkoutForm").addEventListener("submit", async event => {
   event.preventDefault();
   if (!selectedSlip) return toast("Please choose a betslip again.");
   if (countdownText(selectedSlip.expires_at) === "Expired") {

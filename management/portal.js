@@ -102,10 +102,26 @@
       tools.className = "panel";
       $("adminPanel").appendChild(tools);
     }
-    tools.innerHTML = '<div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div><div class="subheading">Customer app banners</div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label>Optional banner image URL</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div>';
+    tools.innerHTML = '<div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div><div class="subheading">Tipster performance</div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div><div class="subheading">Customer app banners</div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div>';
     await loadManagedTipsters();
+    await loadTipsterLeaderboards();
     await loadBanners();
     $("bannerForm").addEventListener("submit", saveBanner);
+    $("bannerImageFile").addEventListener("change", () => {
+      const file = $("bannerImageFile").files?.[0];
+      if (!file) { previewBannerImage($("bannerImage").value.trim()); return; }
+      if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+        $("bannerImageFile").value = "";
+        previewBannerImage($("bannerImage").value.trim());
+        sayBanner("Choose a JPG, PNG or WebP image no larger than 5 MB.");
+        return;
+      }
+      previewBannerImage(URL.createObjectURL(file));
+      sayBanner("Picture selected. Save the banner to upload it.");
+    });
+    $("bannerImage").addEventListener("input", () => {
+      if (!$("bannerImageFile").files?.length) previewBannerImage($("bannerImage").value.trim());
+    });
   }
 
   async function loadManagedTipsters() {
@@ -116,6 +132,57 @@
     root.innerHTML = data.map(t => '<article class="record"><div class="record-head"><strong>@'+esc(t.username)+'</strong><span class="tag">'+esc(t.status)+'</span></div><small>'+esc(t.profiles?.display_name||"")+' · '+esc(t.profiles?.phone||"")+'</small><label>Display name</label><input data-display="'+t.id+'" value="'+esc(t.profiles?.display_name||"")+'" maxlength="60"><label>Username</label><input data-username="'+t.id+'" value="'+esc(t.username)+'" maxlength="24"><label>Description</label><textarea data-bio="'+t.id+'" rows="2" maxlength="240">'+esc(t.bio||"")+'</textarea><div class="record-actions"><button class="approve" data-save-tipster="'+t.id+'">Save changes</button><button class="reject" data-remove-tipster="'+t.id+'">Remove tipster</button></div></article>').join("");
     root.querySelectorAll("[data-save-tipster]").forEach(b=>b.addEventListener("click",()=>saveTipster(b.dataset.saveTipster)));
     root.querySelectorAll("[data-remove-tipster]").forEach(b=>b.addEventListener("click",()=>removeTipster(b.dataset.removeTipster)));
+  }
+
+  async function loadTipsterLeaderboards() {
+    const topRoot = $("topWinningTipsters");
+    const trendRoot = $("trendingTipsters");
+    const [tipsterResult, slipResult, resultResult] = await Promise.all([
+      client.from("tipsters").select("id,username").eq("status","approved"),
+      client.from("betslips").select("id,tipster_id,created_at,status"),
+      client.from("result_submissions").select("slip_id,submitted_result,created_at").eq("status","approved")
+    ]);
+    const queryError = tipsterResult.error || slipResult.error || resultResult.error;
+    if (queryError) {
+      topRoot.textContent = "Could not load winning tipsters: " + queryError.message;
+      trendRoot.textContent = "Could not load trending tipsters: " + queryError.message;
+      return;
+    }
+    const approvedTipsters = tipsterResult.data || [];
+    if (!approvedTipsters.length) {
+      topRoot.textContent = "No approved tipsters yet.";
+      trendRoot.textContent = "No approved tipsters yet.";
+      return;
+    }
+    const stats = new Map(approvedTipsters.map(t => [t.id, {
+      username:t.username, wins:0, losses:0, recentActivity:0
+    }]));
+    const slipsById = new Map();
+    const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    (slipResult.data || []).forEach(s => {
+      slipsById.set(s.id, s);
+      const item = stats.get(s.tipster_id);
+      if (item && s.status === "published" && new Date(s.created_at).getTime() >= since) item.recentActivity++;
+    });
+    (resultResult.data || []).forEach(r => {
+      const slip = slipsById.get(r.slip_id);
+      const item = slip ? stats.get(slip.tipster_id) : null;
+      if (!item) return;
+      if (r.submitted_result === "won") item.wins++;
+      if (r.submitted_result === "lost") item.losses++;
+      if (new Date(r.created_at).getTime() >= since) item.recentActivity++;
+    });
+    const winners = [...stats.values()].filter(x => x.wins > 0)
+      .sort((a,b) => b.wins-a.wins || (b.wins/(b.wins+b.losses||1))-(a.wins/(a.wins+a.losses||1)) || (b.wins+b.losses)-(a.wins+a.losses)).slice(0,5);
+    const trending = [...stats.values()].filter(x => x.recentActivity > 0)
+      .sort((a,b) => b.recentActivity-a.recentActivity || b.wins-a.wins).slice(0,5);
+    topRoot.innerHTML = winners.length ? winners.map((x,i) => {
+      const total=x.wins+x.losses, rate=total?Math.round(x.wins/total*100):0;
+      return '<article class="leaderboard-row"><strong>'+(i+1)+'. @'+esc(x.username)+'</strong><small>'+x.wins+' verified wins · '+x.losses+' losses · '+rate+'% win rate</small></article>';
+    }).join("") : "No admin-verified wins yet.";
+    trendRoot.innerHTML = trending.length ? trending.map((x,i) =>
+      '<article class="leaderboard-row"><strong>'+(i+1)+'. @'+esc(x.username)+'</strong><small>'+x.recentActivity+' recent activities · '+x.wins+' verified wins</small></article>'
+    ).join("") : "No tipster activity in the last 7 days.";
   }
 
   async function saveTipster(id) {
@@ -145,22 +212,38 @@
     const {data,error:e}=await client.from("announcements").select("id,title,message,image_url,active").order("created_at",{ascending:false});
     if(e){root.textContent="Could not load banners: "+e.message;return;}
     if(!data?.length){root.textContent="No banners created yet.";return;}
-    root.innerHTML=data.map(a=>'<article class="record"><div class="record-head"><strong>'+esc(a.title)+'</strong><span class="tag">'+(a.active?"ACTIVE":"HIDDEN")+'</span></div><p class="muted">'+esc(a.message)+'</p><div class="record-actions"><button class="approve" data-edit-banner="'+a.id+'">Edit</button><button class="reject" data-delete-banner="'+a.id+'">Delete</button></div></article>').join("");
-    root.querySelectorAll("[data-edit-banner]").forEach(b=>b.addEventListener("click",()=>{const a=data.find(x=>x.id===b.dataset.editBanner);$("bannerTitle").value=a.title;$("bannerMessage").value=a.message;$("bannerImage").value=a.image_url||"";$("bannerActive").checked=a.active;$("bannerForm").dataset.editId=a.id;}));
+    root.innerHTML=data.map(a=>'<article class="record"><div class="record-head"><strong>'+esc(a.title)+'</strong><span class="tag">'+(a.active?"ACTIVE":"HIDDEN")+'</span></div>'+(a.image_url?'<img class="banner-list-image" alt="Banner image" src="'+esc(a.image_url)+'">':'')+'<p class="muted">'+esc(a.message)+'</p><div class="record-actions"><button class="approve" data-edit-banner="'+a.id+'">Edit</button><button class="reject" data-delete-banner="'+a.id+'">Delete</button></div></article>').join("");
+    root.querySelectorAll("[data-edit-banner]").forEach(b=>b.addEventListener("click",()=>{const a=data.find(x=>x.id===b.dataset.editBanner);$("bannerTitle").value=a.title;$("bannerMessage").value=a.message;$("bannerImage").value=a.image_url||"";$("bannerImageFile").value="";previewBannerImage(a.image_url||"");$("bannerActive").checked=a.active;$("bannerForm").dataset.editId=a.id;}));
     root.querySelectorAll("[data-delete-banner]").forEach(b=>b.addEventListener("click",async()=>{if(!confirm("Delete this banner?"))return;const {error:e2}=await client.from("announcements").delete().eq("id",b.dataset.deleteBanner);if(e2){sayBanner(e2.message);return;}await loadBanners();}));
   }
 
   function sayBanner(message){$("bannerStatus").textContent=message;}
 
+  function previewBannerImage(src) {
+    const box=$("bannerImagePreview");
+    if(!box)return;
+    box.innerHTML=src?'<img alt="Selected banner preview" src="'+esc(src)+'">':"No banner picture selected.";
+  }
+
   async function saveBanner(e) {
     e.preventDefault();
-    const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:$("bannerImage").value.trim()||null,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
     try {
+      let imageUrl=$("bannerImage").value.trim()||null;
+      const file=$("bannerImageFile").files?.[0];
+      if(file){
+        if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>5*1024*1024)throw new Error("Choose a JPG, PNG or WebP image no larger than 5 MB.");
+        const extension=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
+        const objectPath="banners/"+Date.now()+"-"+Math.random().toString(36).slice(2)+"."+extension;
+        const {error:uploadError}=await client.storage.from("ideas-public-media").upload(objectPath,file,{cacheControl:"3600",upsert:false,contentType:file.type});
+        if(uploadError)throw uploadError;
+        imageUrl=client.storage.from("ideas-public-media").getPublicUrl(objectPath).data.publicUrl;
+      }
+      const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:imageUrl,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
       const id=$("bannerForm").dataset.editId;
       const result=id?await client.from("announcements").update(payload).eq("id",id):await client.from("announcements").insert(payload);
       if(result.error)throw result.error;
-      $("bannerForm").reset();delete $("bannerForm").dataset.editId;$("bannerActive").checked=true;
-      sayBanner("Banner saved. It will appear in the Customer App.");
+      $("bannerForm").reset();delete $("bannerForm").dataset.editId;$("bannerActive").checked=true;previewBannerImage("");
+      sayBanner("Banner saved. The picture is uploaded and the banner is ready for the Customer App.");
       await loadBanners();
     } catch(e2){sayBanner(e2.message||"Could not save banner.");}
   }
