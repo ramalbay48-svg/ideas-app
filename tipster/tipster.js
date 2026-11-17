@@ -53,7 +53,72 @@ async function uploadBetslipWithRetry(path,file,bucket="ideas-betslips"){
  throw lastError||new Error("Upload could not connect. Please try again.");
 }
 $("slipForm").addEventListener("submit",async e=>{e.preventDefault();const b=$("uploadButton");b.disabled=true;say("slipStatus","Uploading betslip…");let slipId=null,path=null;try{if(!tipster||tipster.status!=="approved"||profile.role!=="tipster")throw new Error("Your tipster account is not approved.");const odds=Number($("odds").value),price=Number($("price").value),company=$("company").value,expiry=new Date($("expiry").value),file=$("image").files?.[0];if(!Number.isFinite(odds)||odds<=1||!Number.isSafeInteger(price)||price<1||!company||!Number.isFinite(expiry.getTime())||expiry<=new Date())throw new Error("Check odds, price, company and future expiry.");if(!file||!["image/jpeg","image/png","image/webp"].includes(file.type))throw new Error("Choose a JPG, PNG or WebP image.");const uploadFile=await prepareBetslipImage(file);if(uploadFile.size>5*1024*1024)throw new Error("This picture is still larger than 5 MB after compression. Please choose a smaller picture.");const {data:s,error:se}=await client.from("betslips").insert({tipster_id:tipster.id,total_odds:odds,price_tzs:price,betting_company:company,expires_at:expiry.toISOString(),status:"draft"}).select("id").single();if(se)throw se;slipId=s.id;const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]/g,"-").slice(-80)||"betslip-image";path=user.id+"/"+slipId+"/"+safe;await uploadBetslipWithRetry(path,uploadFile);const {error:ae}=await client.from("slip_assets").insert({slip_id:slipId,storage_path:path});if(ae)throw ae;const {error:pe}=await client.from("betslips").update({status:"published",updated_at:new Date().toISOString()}).eq("id",slipId);if(pe)throw pe;$("slipForm").reset();say("slipStatus","Published successfully. Your active slip should now appear in the Customer App marketplace.");await loadMySlips();}catch(err){if(slipId){await client.from("betslips").update({status:"draft"}).eq("id",slipId);}say("slipStatus",err.message||"Could not publish slip.");}finally{b.disabled=false;}});
-async function loadMySlips(){const {data,error}=await client.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,status,created_at").eq("tipster_id",tipster.id).order("created_at",{ascending:false});if(error){$("mySlips").textContent="Could not load your listings: "+error.message;return;}if(!data?.length){$("mySlips").textContent="No listings yet.";return;}$("mySlips").innerHTML=data.map(s=>'<article class="record"><div class="record-head"><strong>'+esc(s.betting_company)+' · Odds '+esc(s.total_odds)+'</strong><span class="tag">'+esc(s.status)+'</span></div><small>TZS '+Number(s.price_tzs).toLocaleString("en-US")+' · Expires '+esc(new Date(s.expires_at).toLocaleString())+'</small></article>').join("");}
+$("resultSubmitForm").addEventListener("submit", async e => {
+ e.preventDefault();
+ const button = e.submitter || $("resultSubmitButton");
+ button.disabled = true;
+ say("resultSubmitStatus","Uploading proof and sending your result for review…");
+ let evidencePath = null;
+ try {
+  if (!tipster || tipster.status !== "approved" || profile.role !== "tipster") throw new Error("Your approved tipster account is required.");
+  const slipId = $("resultSlip").value;
+  const file = $("resultEvidence").files?.[0];
+  if (!slipId) throw new Error("Choose a completed betslip.");
+  if (!file || !["image/jpeg","image/png","image/webp"].includes(file.type)) throw new Error("Choose a JPG, PNG or WebP proof screenshot.");
+  const evidenceFile = await prepareBetslipImage(file);
+  if (evidenceFile.size > 5 * 1024 * 1024) throw new Error("The proof image must be no larger than 5 MB after compression.");
+  const submissionId = crypto.randomUUID();
+  const ext = evidenceFile.type === "image/png" ? "png" : evidenceFile.type === "image/webp" ? "webp" : "jpg";
+  evidencePath = user.id + "/" + slipId + "/" + submissionId + "." + ext;
+  await uploadBetslipWithRetry(evidencePath,evidenceFile,"ideas-result-evidence");
+  const {error:e2} = await client.from("result_submissions").insert({
+   id:submissionId,
+   slip_id:slipId,
+   submitted_by:user.id,
+   submitted_result:$("submittedResult").value,
+   note:$("resultNote").value.trim(),
+   evidence_path:evidencePath,
+   status:"pending"
+  });
+  if (e2) throw e2;
+  $("resultSubmitForm").reset();
+  say("resultSubmitStatus","Submitted successfully. Your result is private until an administrator verifies it.");
+  await loadMySlips();
+ } catch(err) {
+  if (evidencePath) await client.storage.from("ideas-result-evidence").remove([evidencePath]);
+  say("resultSubmitStatus",err.message || "Could not submit this result.");
+ } finally {
+  button.disabled = false;
+ }
+});
+
+async function loadMySlips(){
+ const {data,error}=await client.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,status,created_at").eq("tipster_id",tipster.id).order("created_at",{ascending:false});
+ if(error){$("mySlips").textContent="Could not load your listings: "+error.message;return;}
+ const {data:reports,error:reportError}=await client.from("result_submissions").select("id,slip_id,submitted_result,status,created_at,review_reason").eq("submitted_by",user.id).order("created_at",{ascending:false});
+ if(reportError){$("myResults").textContent="Could not load result reports: "+reportError.message;return;}
+ const latestBySlip=new Map();
+ (reports||[]).forEach(r=>{if(!latestBySlip.has(r.slip_id))latestBySlip.set(r.slip_id,r);});
+ const eligible=(data||[]).filter(s=>{
+  const previous=latestBySlip.get(s.id);
+  return ["published","expired"].includes(s.status) && new Date(s.expires_at).getTime()<=Date.now() && (!previous || previous.status==="rejected");
+ });
+ if(eligible.length){
+  $("resultSubmitForm").classList.remove("hidden");
+  $("resultSlip").innerHTML=eligible.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.betting_company)+' · Odds '+esc(s.total_odds)+' · '+esc(new Date(s.created_at).toLocaleDateString())+'</option>').join("");
+ }else{
+  $("resultSubmitForm").classList.add("hidden");
+  $("resultSubmitStatus").textContent="No completed published slips are ready for a result report yet. A slip becomes eligible after its expiry time.";
+ }
+ if(!data?.length){$("mySlips").textContent="No listings yet.";}
+ else{$("mySlips").innerHTML=data.map(s=>{
+  const report=latestBySlip.get(s.id);
+  const reportLabel=report?" · Result "+report.submitted_result.toUpperCase()+" ("+report.status+")":"";
+  return '<article class="record"><div class="record-head"><strong>'+esc(s.betting_company)+' · Odds '+esc(s.total_odds)+'</strong><span class="tag">'+esc(s.status)+'</span></div><small>TZS '+Number(s.price_tzs).toLocaleString("en-US")+' · Expires '+esc(new Date(s.expires_at).toLocaleString())+esc(reportLabel)+'</small></article>';
+ }).join("");}
+ if(!reports?.length){$("myResults").textContent="You have not submitted any result reports yet.";}
+ else{$("myResults").innerHTML=reports.map(r=>'<article class="record"><div class="record-head"><strong>'+ (r.submitted_result==="won"?"🟢 WON":"🔴 LOST") +'</strong><span class="tag">'+esc(r.status.toUpperCase())+'</span></div><small>Submitted '+esc(new Date(r.created_at).toLocaleString())+'</small>'+(r.review_reason?'<p class="muted">Admin note: '+esc(r.review_reason)+'</p>':'')+'</article>').join("");}
+}
 $("logoutButton").addEventListener("click",async()=>{await client.auth.signOut();user=null;profile=null;tipster=null;$("workspace").classList.add("hidden");$("authPanel").classList.remove("hidden");$("authForm").reset();say("authStatus","You have logged out.");});
 client.auth.getSession().then(async({data})=>{if(data.session?.user){try{await enter(data.session.user);}catch(e){$("workspace").classList.add("hidden");$("authPanel").classList.remove("hidden");say("authStatus",e.message||"Could not load account.");}}});
 })();
