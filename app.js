@@ -237,38 +237,61 @@ function updateAccountControls() {
   $("#adminOpen").hidden = true;
 }
 
-function followedTipsterIds() {
-  try { return JSON.parse(localStorage.getItem("ideas_followed_tipsters") || "[]"); } catch { return []; }
+async function getFollowStats(tipsterIds) {
+  const ids = [...new Set((tipsterIds || []).filter(Boolean))];
+  const counts = new Map(), followed = new Set();
+  if (!db || !ids.length) return {counts, followed};
+  const {data: countRows, error: countError} = await db.from("public_tipster_follower_counts")
+    .select("tipster_id,follower_count").in("tipster_id", ids);
+  if (countError) console.warn("Follower totals:", countError.message);
+  (countRows || []).forEach(row => counts.set(row.tipster_id, Number(row.follower_count || 0)));
+  if (currentUser) {
+    const {data: ownRows, error: ownError} = await db.from("tipster_follows")
+      .select("tipster_id").eq("follower_id", currentUser.id).in("tipster_id", ids);
+    if (ownError) console.warn("Following list:", ownError.message);
+    (ownRows || []).forEach(row => followed.add(row.tipster_id));
+  }
+  return {counts, followed};
 }
-function setFollowedTipster(id, follow) {
-  const ids = followedTipsterIds().filter(value => value !== id);
-  if (follow) ids.push(id);
-  localStorage.setItem("ideas_followed_tipsters", JSON.stringify(ids));
+async function toggleTipsterFollow(tipsterId) {
+  if (!currentUser) {
+    showAuth("login");
+    toast("Log in to follow this tipster.");
+    return;
+  }
+  const {data:existing, error:lookupError} = await db.from("tipster_follows")
+    .select("tipster_id").eq("tipster_id", tipsterId).eq("follower_id", currentUser.id).maybeSingle();
+  if (lookupError) return toast("Could not check your following list. Please try again.");
+  const result = existing
+    ? await db.from("tipster_follows").delete().eq("tipster_id", tipsterId).eq("follower_id", currentUser.id)
+    : await db.from("tipster_follows").insert({tipster_id:tipsterId, follower_id:currentUser.id});
+  if (result.error) {
+    console.warn("Follow update:", result.error.message);
+    return toast("Could not update your follow. Please try again.");
+  }
+  toast(existing ? "Tipster removed from Following." : "You are now following this tipster.");
+  await loadHomeTipsters();
+  const panel = $("#appPagePanel");
+  if (panel && /YOUR PICKS|Following/i.test(panel.textContent || "")) await loadFollowingPage(panel);
 }
-function followButton(tipsterId) {
-  const followed = followedTipsterIds().includes(tipsterId);
-  return '<button class="follow-button" data-follow="' + escapeHtml(tipsterId) + '" aria-pressed="' + followed + '">' + (followed ? 'Following' : '+ Follow') + '</button>';
+function followButton(tipsterId, isFollowing = false) {
+  return '<button type="button" class="follow-button" data-follow="' + escapeHtml(tipsterId) + '" aria-pressed="' + isFollowing + '">' + (isFollowing ? 'Following' : '+ Follow') + '</button>';
 }
 function wireFollowButtons(root) {
-  root.querySelectorAll("[data-follow]").forEach(button => button.addEventListener("click", () => {
-    const id = button.dataset.follow, follow = !followedTipsterIds().includes(id);
-    setFollowedTipster(id, follow);
-    button.outerHTML = followButton(id);
-    wireFollowButtons(root);
-    toast(follow ? "Added to Following on this device." : "Removed from Following on this device.");
-  }));
+  root.querySelectorAll("[data-follow]").forEach(button => button.addEventListener("click", () => toggleTipsterFollow(button.dataset.follow)));
 }
 async function getApprovedTipsters() {
   if (!db) return [];
   const {data,error} = await db.from("tipsters").select("id,user_id,username,bio").eq("status","approved").order("created_at",{ascending:false});
   if (error) { console.warn("Approved tipsters:",error.message); return []; }
   const profiles = await getPublicTipsterProfiles((data||[]).map(t=>t.user_id));
-  return (data||[]).map(t=>({...t,profiles:profiles.get(t.user_id)||null}));
+  const stats = await getFollowStats((data||[]).map(t=>t.id));
+  return (data||[]).map(t=>({...t,profiles:profiles.get(t.user_id)||null,followers_count:stats.counts.get(t.id)||0,is_following:stats.followed.has(t.id)}));
 }
 function tipsterCard(t) {
   const name=t.profiles?.display_name||t.username||"Tipster";
   const avatar=t.profiles?.avatar_path?'<img alt="" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':escapeHtml(name.charAt(0).toUpperCase());
-  return '<article class="tipster"><div class="tipster-avatar">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>@'+escapeHtml(t.username)+'</small>'+followButton(t.id)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
+  return '<article class="tipster"><div class="tipster-avatar">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>@'+escapeHtml(t.username)+'</small><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
 }
 async function loadHomeTipsters() {
   const rows=await getApprovedTipsters();
@@ -276,13 +299,18 @@ async function loadHomeTipsters() {
   if (!root || !suggestions) return;
   if (!rows.length) {root.innerHTML='<div class="empty">Approved tipsters will appear here.</div>';suggestions.innerHTML='<div class="empty">New tipsters will appear here.</div>';return;}
   root.innerHTML=rows.slice(0,6).map(tipsterCard).join("");
-  suggestions.innerHTML=rows.filter(t=>!followedTipsterIds().includes(t.id)).slice(0,6).map(tipsterCard).join("") || '<div class="empty">You are following all currently listed tipsters.</div>';
+  suggestions.innerHTML=rows.filter(t=>!t.is_following).slice(0,6).map(tipsterCard).join("") || '<div class="empty">You are following all currently listed tipsters.</div>';
   [root,suggestions].forEach(wireFollowButtons);
   [root,suggestions].forEach(container=>container.querySelectorAll("[data-open-tipster]").forEach(button=>button.addEventListener("click",()=>{const t=rows.find(x=>x.id===button.dataset.openTipster);if(t){showPage("tipsters",true);loadTipsterDetail($("#appPagePanel"),t);}})));
 }
 async function loadFollowingPage(panel) {
-  panel.innerHTML='<p class="eyebrow">YOUR PICKS</p><h2>Following</h2><p class="muted">Tipsters you choose to follow on this device.</p><div class="tipster-row" id="followingList"><div class="empty">Loading…</div></div>';
-  const rows=await getApprovedTipsters(), ids=followedTipsterIds(), selected=rows.filter(t=>ids.includes(t.id)), root=$("#followingList");
+  panel.innerHTML='<p class="eyebrow">YOUR PICKS</p><h2>Following</h2><p class="muted">Tipsters you follow.</p><div class="tipster-row" id="followingList"><div class="empty">Loading…</div></div>';
+  if (!currentUser) {
+    panel.querySelector("#followingList").innerHTML='<div class="empty">Log in to see and manage your followed tipsters.</div><button class="primary-action" id="followingLogin">Log in</button>';
+    $("#followingLogin").onclick=()=>showAuth("login");
+    return;
+  }
+  const rows=await getApprovedTipsters(), selected=rows.filter(t=>t.is_following), root=$("#followingList");
   if (!selected.length) {root.innerHTML='<div class="empty">You are not following anyone yet. Explore approved tipsters and tap Follow.</div><button class="primary-action" id="discoverTipsters">Discover tipsters</button>';$("#discoverTipsters").onclick=()=>showPage("tipsters");return;}
   root.innerHTML=selected.map(tipsterCard).join("");wireFollowButtons(root);
 }
