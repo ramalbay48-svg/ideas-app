@@ -44,3 +44,5 @@ button,input{font:inherit}.topbar{height:66px;padding:0 max(20px,calc((100% - 90
 .tipster-profile-follow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:11px 13px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
 .tipster-profile-follow>strong{font-size:13px}
 .follow-button[aria-pressed="true"]{background:#202820;color:#b9f5ce;border-color:#28643e}
+
+.seller.tipster-profile-link{border:0;padding:0;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}
