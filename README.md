@@ -31,6 +31,12 @@ A starter database migration is in `supabase/schema.sql`. It is intended for a *
 This is a foundation only. It does not connect the frontend, create credentials, configure private Storage policies, implement a payment gateway, or make the current demo login/admin screens secure. Do not publish real customer or payment data until those pieces are completed and tested.
 
 
+## Admin-verified tipster result reports
+
+The Tipster app lets approved tipsters report a completed slip as WON or LOST and upload a private proof screenshot. Reports remain pending until an administrator confirms or rejects them in the Management app. The result-review function writes each decision to the admin audit log.
+
+For an existing IDEAS APP Supabase project, run `supabase/migrations/20261117_admin_verified_results.sql` in the IDEAS APP Supabase SQL Editor before testing result submissions. The migration creates the private evidence bucket and storage policies, restricts tipster submissions to pending claims for their own completed slips, prevents direct client-side result approval, and installs the admin review RPC. Do not run this in JM SHOP.
+
 ## Supabase browser connection (initial)
 
 The frontend now loads Supabase JS v2 and initializes a browser client with the IDEAS APP project URL and its publishable key. It performs a small read-only connection check against the announcements table and displays a connection status. This does **not** enable real customer authentication, tipster uploads, purchases, payment processing, or slip unlocking. Those require the agreed authentication design and secure server-side functions. The publishable key is public by design; never add a Supabase secret key or service-role key to browser files.
