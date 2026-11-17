@@ -247,7 +247,7 @@ function setFollowedTipster(id, follow) {
 }
 function followButton(tipsterId) {
   const followed = followedTipsterIds().includes(tipsterId);
-  return '<button class="follow-button" data-follow="' + escapeHtml(tipsterId) + '" aria-pressed="' + followed + '">' + (followed ? 'Following ✓' : '+ Follow') + '</button>';
+  return '<button class="follow-button" data-follow="' + escapeHtml(tipsterId) + '" aria-pressed="' + followed + '">' + (followed ? 'Following' : '+ Follow') + '</button>';
 }
 function wireFollowButtons(root) {
   root.querySelectorAll("[data-follow]").forEach(button => button.addEventListener("click", () => {
@@ -343,7 +343,7 @@ async function loadTipsterDetail(panel, tipster) {
 
 function verifiedResultRow(result) {
   const won = result.submitted_result === "won";
-  return '<div class="tipster-result-row '+(won ? "won" : "lost")+'"><span class="tipster-result-icon" aria-hidden="true">'+(won ? "✓" : "×")+'</span><span class="tipster-result-copy"><strong>'+(won ? "WON" : "LOST")+'</strong><small>'+escapeHtml(result.betting_company || "Betslip")+' · Odds '+escapeHtml(result.total_odds ?? "—")+'</small></span></div>';
+  return '<div class="tipster-result-row '+(won ? "won" : "lost")+'" aria-label="'+(won ? "Won" : "Lost")+'"><span class="tipster-result-dot" aria-hidden="true"></span></div>';
 }
 
 async function loadMarketplace() {
