@@ -321,8 +321,10 @@ async function loadTipstersPage(panel) {
   if (error) { panel.innerHTML = '<h2>Tipsters</h2><p class="muted">Could not load tipsters. Check database permissions.</p>'; return; }
   if (!data?.length) { panel.innerHTML = '<h2>Approved tipsters</h2><div class="empty">No approved tipsters yet. Check back soon.</div>'; return; }
   const profiles = await getPublicTipsterProfiles(data.map(t => t.user_id));
-  const rows = data.map(t => ({...t, profiles: profiles.get(t.user_id) || null}));
-  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + rows.map(t => '<article class="tipster"><div class="tipster-avatar">'+(t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(t.profiles?.display_name||t.username)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase()))+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><p class="muted">'+escapeHtml(t.bio||"")+'</p><button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>').join("") + '</div>';
+  const stats = await getFollowStats(data.map(t => t.id));
+  const rows = data.map(t => ({...t, profiles: profiles.get(t.user_id) || null, followers_count: stats.counts.get(t.id) || 0, is_following: stats.followed.has(t.id)}));
+  panel.innerHTML = '<p class="eyebrow">DISCOVER</p><h2>Approved tipsters</h2><div class="tipster-row">' + rows.map(t => '<article class="tipster"><div class="tipster-avatar">'+(t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(t.profiles?.display_name||t.username)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml((t.profiles?.display_name||t.username||"T").charAt(0).toUpperCase()))+'</div><strong>'+escapeHtml(t.profiles?.display_name||t.username)+'</strong><small>@'+escapeHtml(t.username)+'</small><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<p class="muted">'+escapeHtml(t.bio||"")+'</p><button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>').join("") + '</div>';
+  wireFollowButtons(panel);
   panel.querySelectorAll("[data-open-tipster]").forEach(button => {
     button.addEventListener("click", () => {
       const selected = rows.find(t => t.id === button.dataset.openTipster);
@@ -333,8 +335,9 @@ async function loadTipstersPage(panel) {
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
   const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
-  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-results-wrap"><strong class="tipster-results-title">Recent results</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div></div><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
+  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-profile-follow"><strong>' + Number(tipster.followers_count||0).toLocaleString() + ' followers</strong>' + followButton(tipster.id,tipster.is_following) + '</div><div class="tipster-results-wrap"><strong class="tipster-results-title">Recent results</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div></div><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
   $("#backToTipsters").addEventListener("click", () => loadTipstersPage(panel));
+  wireFollowButtons(panel);
   const {data: verifiedRows, error: verifiedError} = await db.from("public_verified_results")
     .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
     .eq("tipster_id", tipster.id).order("reviewed_at", {ascending:false}).limit(30);
