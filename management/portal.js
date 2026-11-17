@@ -84,7 +84,7 @@
   async function reviewTipster(id, decision) {
     error("");
     try {
-      const {error:e} = await client.rpc("admin_review_tipster", {
+      const {error:e} = await client.rpc("review_tipster_application", {
         p_tipster_id:id, p_decision:decision, p_reason:null
       });
       if (e) throw e;
