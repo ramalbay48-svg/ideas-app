@@ -96,6 +96,9 @@ using (
   )
 );
 
+-- Remove the earlier same-signature function so PostgreSQL accepts the renamed input parameter.
+drop function if exists public.admin_review_result_submission(uuid, text, text);
+
 create or replace function public.admin_review_result_submission(
   p_result_submission_id uuid,
   p_decision text,
