@@ -24,3 +24,10 @@ footer{color:#65736a}
 .admin-shortcuts button:active,.admin-shortcuts button:focus{background:#e0f4e7;border-color:#008f4c;outline:none}
 #bannerSection{scroll-margin-top:130px}
 #adminPanel,#resultsPanel,#auditPanel,#adminToolsPanel{scroll-margin-top:130px}
+
+/* Independent Owner dashboard sections */
+.admin-shortcuts{position:sticky;top:68px;z-index:6;display:flex;gap:8px;overflow-x:auto;padding:10px 2px 14px;margin:0 0 12px;background:#f5f8f6}
+.admin-shortcuts button{flex:0 0 auto;border:1px solid #cfe2d5;border-radius:999px;background:#fff;color:#087a43;padding:11px 15px;font:700 12px system-ui;white-space:nowrap}
+.admin-shortcuts button.active{background:#008f4c;color:#fff;border-color:#008f4c}
+.dashboard-section{display:none!important;margin-top:14px}
+.dashboard-section.section-active{display:block!important}
