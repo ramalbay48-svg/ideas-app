@@ -59,16 +59,20 @@
       ["Approve Tipsters", "adminPanel"],
       ["Verify Results", "resultsPanel"],
       ["Activity Log", "auditPanel"],
-      ["Manage Profiles", "managedTipsters"],
-      ["Top & Trending", "topWinningTipsters"],
-      ["Create Banner", "bannerSection"]
+      ["Manage Profiles", "managedTipstersPanel"],
+      ["Top & Trending", "rankingsPanel"],
+      ["Create Banner", "bannerSectionPanel"]
     ];
     nav.innerHTML = links.map(([label,target]) => '<button type="button" data-target="' + target + '">' + label + '</button>').join("");
     $("roleNotice").insertAdjacentElement("afterend", nav);
-    nav.querySelectorAll("button[data-target]").forEach(button => button.addEventListener("click", () => {
-      const target = $(button.dataset.target);
-      if (target) target.scrollIntoView({behavior:"smooth",block:"start"});
-    }));
+    const sections = links.map(([,id]) => $(id)).filter(Boolean);
+    sections.forEach(section => section.classList.add("dashboard-section"));
+    function activate(targetId) {
+      sections.forEach(section => section.classList.toggle("section-active", section.id === targetId));
+      nav.querySelectorAll("button[data-target]").forEach(button => button.classList.toggle("active", button.dataset.target === targetId));
+    }
+    nav.querySelectorAll("button[data-target]").forEach(button => button.addEventListener("click", () => activate(button.dataset.target)));
+    activate("adminPanel");
   }
 
   async function checkApplication() {
@@ -124,12 +128,11 @@
   async function renderAdminTools() {
     let tools = $("adminToolsPanel");
     if (!tools) {
-      tools = document.createElement("section");
+      tools = document.createElement("div");
       tools.id = "adminToolsPanel";
-      tools.className = "panel";
-      $("adminPanel").appendChild(tools);
+      $("workspace").appendChild(tools);
     }
-    tools.innerHTML = '<div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div><div class="subheading">Tipster performance</div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div><div class="subheading" id="bannerSection">Customer app banners</div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div>';
+    tools.innerHTML = '<section class="panel dashboard-section" id="managedTipstersPanel"><div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div></section><section class="panel dashboard-section" id="rankingsPanel"><div class="panel-heading"><div><p class="eyebrow">PERFORMANCE</p><h3>Tipster rankings</h3></div></div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div></section><section class="panel dashboard-section" id="bannerSectionPanel"><div class="panel-heading"><div><p class="eyebrow">CUSTOMER APP</p><h3 id="bannerSection">Create or manage banners</h3></div></div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div></section>';
     await loadManagedTipsters();
     await loadTipsterLeaderboards();
     await loadBanners();
