@@ -305,7 +305,7 @@ async function loadTipstersPage(panel) {
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
   const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
-  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Verified results</h3><div id="tipsterVerifiedResults"><div class="empty">Loading verified results…</div></div><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
+  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-results-wrap"><strong class="tipster-results-title">Recent results</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div></div><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
   $("#backToTipsters").addEventListener("click", () => loadTipstersPage(panel));
   const {data: verifiedRows, error: verifiedError} = await db.from("public_verified_results")
     .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
@@ -318,7 +318,7 @@ async function loadTipsterDetail(panel, tipster) {
     } else if (!verifiedRows?.length) {
       verifiedRoot.innerHTML = '<div class="empty">No administrator-verified results yet.</div>';
     } else {
-      verifiedRoot.innerHTML = verifiedRows.map(result => verifiedResultCard(result, false)).join("");
+      verifiedRoot.innerHTML = verifiedRows.slice(0,6).map(result => verifiedResultRow(result)).join("");
     }
   }
   const {data, error} = await db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at").eq("tipster_id", tipster.id).eq("status", "published").gt("expires_at", new Date().toISOString()).order("created_at", {ascending:false});
@@ -341,35 +341,9 @@ async function loadTipsterDetail(panel, tipster) {
   }));
 }
 
-function verifiedResultCard(result, showTipster = true) {
+function verifiedResultRow(result) {
   const won = result.submitted_result === "won";
-  return '<article class="verified-result-card"><div class="verified-result-head"><strong>' +
-    (showTipster ? '@' + escapeHtml(result.username || "Tipster") + ' · ' : '') +
-    escapeHtml(result.betting_company || "Betting slip") +
-    '</strong><span class="verified-result-badge ' + (won ? 'won' : 'lost') + '">' +
-    (won ? '● WIN' : '● LOSS') + '</span></div><div class="verified-result-meta">' +
-    'Odds ' + escapeHtml(result.total_odds ?? "—") +
-    (result.reviewed_at ? ' · Verified ' + escapeHtml(new Date(result.reviewed_at).toLocaleDateString()) : '') +
-    '</div><div class="verified-result-confirmation">Administrator verified</div></article>';
-}
-
-async function loadVerifiedResults() {
-  const root = $("#verifiedResults");
-  if (!root || !db) return;
-  root.innerHTML = '<div class="empty">Loading verified results…</div>';
-  const {data, error} = await db.from("public_verified_results")
-    .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
-    .order("reviewed_at", {ascending:false}).limit(8);
-  if (error) {
-    console.warn("Public verified results:", error.message);
-    root.innerHTML = '<div class="empty">Verified results are temporarily unavailable.</div>';
-    return;
-  }
-  if (!data?.length) {
-    root.innerHTML = '<div class="empty">No administrator-verified results have been published yet.</div>';
-    return;
-  }
-  root.innerHTML = data.map(result => verifiedResultCard(result, true)).join("");
+  return '<div class="tipster-result-row '+(won ? "won" : "lost")+'"><span class="tipster-result-icon" aria-hidden="true">'+(won ? "✓" : "×")+'</span><span class="tipster-result-copy"><strong>'+(won ? "WON" : "LOST")+'</strong><small>'+escapeHtml(result.betting_company || "Betslip")+' · Odds '+escapeHtml(result.total_odds ?? "—")+'</small></span></div>';
 }
 
 async function loadMarketplace() {
@@ -514,7 +488,6 @@ async function initialize() {
   });
   await loadMarketplace();
   await loadHomeTipsters();
-  await loadVerifiedResults();
   const {data:news} = await db.from("announcements").select("title,message,image_url").eq("active",true).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if (news) { const banner=$(".banner"); if (banner) { banner.querySelector("h2").textContent=news.title; banner.querySelector("p").textContent=news.message; if(news.image_url){banner.style.backgroundImage="linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.18)),url("+JSON.stringify(news.image_url)+")";banner.style.backgroundSize="cover";banner.style.backgroundPosition="center";} } }
   updateAccountControls();
