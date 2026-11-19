@@ -582,6 +582,48 @@ $("#adminClose").addEventListener("click",()=>$("#adminDashboard").close());
 $("#profileClose").addEventListener("click",()=>$("#profileModal").close());
 $("#authModal").addEventListener("click", event => { if(event.target === $("#authModal")) $("#authModal").close(); });
 
+let bannerSlides = [];
+let bannerIndex = 0;
+let bannerTimer = null;
+function showBannerSlide(index) {
+  const banner = $(".banner");
+  if (!banner || !bannerSlides.length) return;
+  bannerIndex = (index + bannerSlides.length) % bannerSlides.length;
+  const slide = bannerSlides[bannerIndex];
+  const heading = banner.querySelector("h2");
+  const message = banner.querySelector("p");
+  const symbol = banner.querySelector(".banner-symbol");
+  const tag = banner.querySelector(".banner-tag");
+  if (heading) heading.textContent = slide.title || "IDEAS APP";
+  if (message) message.textContent = slide.message || "";
+  if (tag) tag.textContent = "FEATURED";
+  if (symbol) symbol.hidden = !!slide.image_url;
+  banner.classList.toggle("has-image", !!slide.image_url);
+  banner.style.backgroundImage = slide.image_url
+    ? 'linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.16)),url(' + JSON.stringify(slide.image_url) + ')'
+    : "";
+  banner.style.backgroundSize = slide.image_url ? "cover" : "";
+  banner.style.backgroundPosition = slide.image_url ? "center" : "";
+  banner.querySelectorAll("[data-banner-dot]").forEach((dot, i) => {
+    dot.classList.toggle("active", i === bannerIndex);
+    dot.setAttribute("aria-current", i === bannerIndex ? "true" : "false");
+  });
+}
+function startBannerCarousel() {
+  const banner = $(".banner");
+  if (!banner) return;
+  clearInterval(bannerTimer);
+  bannerTimer = null;
+  if (bannerSlides.length < 2) return;
+  bannerTimer = setInterval(() => {
+    if (!document.hidden) showBannerSlide(bannerIndex + 1);
+  }, 5000);
+  banner.addEventListener("click", event => {
+    const dot = event.target.closest("[data-banner-dot]");
+    if (!dot) return;
+    showBannerSlide(Number(dot.dataset.bannerDot));
+  });
+}
 async function initialize() {
   $("#tipsterOpen").hidden = true;
   $("#adminOpen").hidden = true;
@@ -605,8 +647,30 @@ async function initialize() {
   });
   await loadMarketplace();
   await loadHomeTipsters();
-  const {data:news} = await db.from("announcements").select("title,message,image_url").eq("active",true).order("created_at",{ascending:false}).limit(1).maybeSingle();
-  if (news) { const banner=$(".banner"); if (banner) { banner.querySelector("h2").textContent=news.title; banner.querySelector("p").textContent=news.message; if(news.image_url){banner.style.backgroundImage="linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.18)),url("+JSON.stringify(news.image_url)+")";banner.style.backgroundSize="cover";banner.style.backgroundPosition="center";} } }
+  const {data:news, error:newsError} = await db.from("announcements")
+    .select("id,title,message,image_url")
+    .eq("active",true)
+    .order("created_at",{ascending:false});
+  if (newsError) console.warn("Featured banners:", newsError.message);
+  bannerSlides = news || [];
+  const banner = $(".banner");
+  if (banner && bannerSlides.length) {
+    const content = banner.querySelector(":scope > div:first-child");
+    if (content) {
+      content.classList.add("banner-content");
+      const dots = document.createElement("div");
+      dots.className = "banner-dots";
+      dots.setAttribute("aria-label", "Choose featured banner");
+      dots.innerHTML = bannerSlides.map((slide, i) =>
+        '<button type="button" class="banner-dot' + (i === 0 ? ' active' : '') +
+        '" data-banner-dot="' + i + '" aria-label="Show banner ' + (i + 1) +
+        '" aria-current="' + (i === 0 ? 'true' : 'false') + '"></button>'
+      ).join("");
+      banner.appendChild(dots);
+    }
+    showBannerSlide(0);
+    startBannerCarousel();
+  }
   updateAccountControls();
 }
 initialize();
