@@ -61,6 +61,7 @@
       ["Activity Log", "auditPanel"],
       ["Manage Profiles", "managedTipstersPanel"],
       ["Top & Trending", "rankingsPanel"],
+      ["Manage History", "historyManagementPanel"],
       ["Create Banner", "bannerSectionPanel"]
     ];
     nav.innerHTML = links.map(([label,target]) => '<button type="button" data-target="' + target + '">' + label + '</button>').join("");
@@ -132,10 +133,11 @@
       tools.id = "adminToolsPanel";
       $("workspace").appendChild(tools);
     }
-    tools.innerHTML = '<section class="panel dashboard-section" id="managedTipstersPanel"><div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div></section><section class="panel dashboard-section" id="rankingsPanel"><div class="panel-heading"><div><p class="eyebrow">PERFORMANCE</p><h3>Tipster rankings</h3></div></div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div></section><section class="panel dashboard-section" id="bannerSectionPanel"><div class="panel-heading"><div><p class="eyebrow">CUSTOMER APP</p><h3 id="bannerSection">Create or manage banners</h3></div></div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div></section>';
+    tools.innerHTML = '<section class="panel dashboard-section" id="managedTipstersPanel"><div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div></section><section class="panel dashboard-section" id="rankingsPanel"><div class="panel-heading"><div><p class="eyebrow">PERFORMANCE</p><h3>Tipster rankings</h3></div></div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div></section><section class="panel dashboard-section" id="historyManagementPanel"><div class="panel-heading"><div><p class="eyebrow">RECORD MANAGEMENT</p><h3>Manage betslip history</h3></div></div><div id="historyBetslips" class="records">Loading betslips…</div></section><section class="panel dashboard-section" id="bannerSectionPanel"><div class="panel-heading"><div><p class="eyebrow">CUSTOMER APP</p><h3 id="bannerSection">Create or manage banners</h3></div></div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div></section>';
     await loadManagedTipsters();
     await loadTipsterLeaderboards();
     await loadBanners();
+    await loadHistoryBetslips();
     $("bannerForm").addEventListener("submit", saveBanner);
     $("bannerImageFile").addEventListener("change", () => {
       const file = $("bannerImageFile").files?.[0];
@@ -286,7 +288,7 @@
     $("resultList").textContent = "Loading result submissions…";
     const {data,error:e} = await client.from("result_submissions")
       .select("id,slip_id,submitted_by,submitted_result,note,status,created_at,review_reason,evidence_path,betslips(betting_company,total_odds,tipsters(username))")
-      .order("created_at",{ascending:false}).limit(50);
+      .is("archived_at",null).order("created_at",{ascending:false}).limit(50);
     if (e) throw e;
     if (!data?.length) { $("resultList").textContent = "No result submissions yet."; return; }
     const rows = await Promise.all(data.map(async r => {
@@ -301,10 +303,11 @@
       const proof = r.evidenceUrl
         ? '<p><a href="' + esc(r.evidenceUrl) + '" target="_blank" rel="noopener">Open proof screenshot ↗</a></p>'
         : '<p class="muted">Proof screenshot unavailable.</p>';
-      return '<article class="record"><div class="record-head"><div><strong>' + esc(tipsterName) + ' · ' + esc(slip.betting_company || "Betting slip") + '</strong><small>Submitted ' + esc(new Date(r.created_at).toLocaleString()) + '</small></div><span class="tag">' + esc(r.status) + '</span></div><p class="muted">Claimed result: <strong>' + esc(r.submitted_result.toUpperCase()) + '</strong>' + (slip.total_odds ? ' · Odds ' + esc(slip.total_odds) : '') + '</p>' + (r.note ? '<p class="muted">' + esc(r.note) + '</p>' : '') + proof + (r.review_reason ? '<p class="muted">Review note: ' + esc(r.review_reason) + '</p>' : '') + (r.status === "pending" ? '<div class="record-actions"><button class="approve" data-result-approve="' + r.id + '">Confirm result</button><button class="reject" data-result-reject="' + r.id + '">Reject result</button></div>' : '') + '</article>';
+      return '<article class="record"><div class="record-head"><div><strong>' + esc(tipsterName) + ' · ' + esc(slip.betting_company || "Betting slip") + '</strong><small>Submitted ' + esc(new Date(r.created_at).toLocaleString()) + '</small></div><span class="tag">' + esc(r.status) + '</span></div><p class="muted">Claimed result: <strong>' + esc(r.submitted_result.toUpperCase()) + '</strong>' + (slip.total_odds ? ' · Odds ' + esc(slip.total_odds) : '') + '</p>' + (r.note ? '<p class="muted">' + esc(r.note) + '</p>' : '') + proof + (r.review_reason ? '<p class="muted">Review note: ' + esc(r.review_reason) + '</p>' : '') + '<div class="record-actions"><button class="reject" data-archive-admin-result="' + r.id + '">Remove from history</button></div>' + (r.status === "pending" ? '<div class="record-actions"><button class="approve" data-result-approve="' + r.id + '">Confirm result</button><button class="reject" data-result-reject="' + r.id + '">Reject result</button></div>' : '') + '</article>';
     }).join("");
     $("resultList").querySelectorAll("[data-result-approve]").forEach(b => b.addEventListener("click", () => reviewResult(b.dataset.resultApprove,"approved")));
     $("resultList").querySelectorAll("[data-result-reject]").forEach(b => b.addEventListener("click", () => reviewResult(b.dataset.resultReject,"rejected")));
+    $("resultList").querySelectorAll("[data-archive-admin-result]").forEach(b=>b.addEventListener("click",()=>archiveAdminHistory("archive_ideas_result",b.dataset.archiveAdminResult)));
   }
 
   async function reviewResult(id, decision) {
@@ -317,6 +320,26 @@
       await loadResultSubmissions();
       await loadAuditLogs();
     } catch (e) { error("Could not review result: " + (e.message || "Unknown error")); }
+  }
+
+
+  async function archiveAdminHistory(fn,id) {
+    if(!confirm("Remove this item from visible history? Purchases and payment records will be preserved.")) return;
+    try {
+      const args=fn==="archive_ideas_betslip"?{p_slip_id:id}:{p_result_id:id};
+      const {error:e}=await client.rpc(fn,args);
+      if(e) throw e;
+      error("History item safely archived.");
+      await loadResultSubmissions(); await loadHistoryBetslips(); await loadAuditLogs();
+    } catch(e) { error("Could not archive history: "+(e.message||"Unknown error")); }
+  }
+  async function loadHistoryBetslips() {
+    const root=$("historyBetslips"); if(!root)return;
+    const {data,error:e}=await client.from("betslips").select("id,betting_company,total_odds,price_tzs,status,created_at,tipsters(username)").neq("status","removed").order("created_at",{ascending:false}).limit(100);
+    if(e){root.textContent="Could not load betslips: "+e.message;return;}
+    if(!data?.length){root.textContent="No active betslips found.";return;}
+    root.innerHTML=data.map(b=>'<article class="record"><div class="record-head"><strong>@'+esc(b.tipsters?.username||"Tipster")+' · '+esc(b.betting_company||"Betslip")+'</strong><span class="tag">'+esc(b.status)+'</span></div><small>Odds '+esc(b.total_odds)+' · TZS '+Number(b.price_tzs).toLocaleString("en-US")+'</small><div class="record-actions"><button class="reject" data-archive-admin-slip="'+b.id+'">Remove from history</button></div></article>').join("");
+    root.querySelectorAll("[data-archive-admin-slip]").forEach(b=>b.addEventListener("click",()=>archiveAdminHistory("archive_ideas_betslip",b.dataset.archiveAdminSlip)));
   }
 
   async function loadAuditLogs() {
