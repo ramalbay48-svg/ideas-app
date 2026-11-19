@@ -54,39 +54,58 @@ $("#checkoutForm").addEventListener("submit", async event => {
     selectedSlip = null;
     return toast("This betslip has expired.");
   }
+
   const provider = $("#paymentMethod").value;
   const phone = $("#paymentPhone").value.trim();
+  const customerName = $("#paymentCustomerName").value.trim();
+  const customerEmail = $("#paymentCustomerEmail").value.trim();
   if (!provider || !/^[67][0-9]{8}$/.test(phone)) {
     return toast("Choose a payment method and enter a valid Tanzanian number.");
   }
+  if (customerName.length < 2) return toast("Enter your full name.");
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(customerEmail)) {
+    return toast("Enter a valid email address.");
+  }
+
   const submitButton = $("#checkoutForm button[type='submit']");
   submitButton.disabled = true;
-  submitButton.textContent = "Saving purchase…";
+  submitButton.textContent = "Requesting payment…";
   try {
-    const {data, error} = await db.rpc("create_checkout_purchase", {
-      p_slip_id: selectedSlip.id,
-      p_provider: provider,
-      p_phone: "+255" + phone
+    const {data, error} = await db.functions.invoke("splashpay-initiate", {
+      body: {
+        slip_id: selectedSlip.id,
+        provider,
+        phone: "255" + phone,
+        customer_name: customerName,
+        customer_email: customerEmail
+      }
     });
     if (error) throw error;
-    if (!data?.purchase_id) throw new Error("The server did not confirm the purchase record.");
-    const alreadyPaid = data.status === "paid";
+    if (data?.already_paid) {
+      $("#unlockPreview").innerHTML =
+        "<strong>This betslip is already purchased</strong><p>Your purchase is recorded as paid. Open My Slips to access it.</p>";
+      $("#unlockPreview").hidden = false;
+      submitButton.textContent = "Already purchased";
+      return;
+    }
+    if (!data?.success || !data?.reference) {
+      throw new Error(data?.error || "SplashPay did not confirm the payment request.");
+    }
+
     $("#unlockPreview").innerHTML =
-      "<strong>" + (alreadyPaid ? "This betslip is already purchased" : "Purchase saved — awaiting payment") + "</strong>" +
+      "<strong>Payment prompt sent to your phone</strong>" +
       "<p>" + escapeHtml(provider) + " · +255 " + escapeHtml(phone) +
-      ". " + (alreadyPaid
-        ? "Your payment is already recorded. Open My Slips to view the purchase status."
-        : "Your purchase is now listed in My Slips as pending. No payment request has been sent and no money has been charged. The betslip remains locked until a payment provider confirms payment securely.") + "</p>";
+      ". Approve the request on your mobile money phone. Reference: " +
+      escapeHtml(data.reference) +
+      ". Your betslip remains locked until SplashPay confirms success.</p>";
     $("#unlockPreview").hidden = false;
-    submitButton.textContent = alreadyPaid ? "Already purchased" : "Saved — payment not connected";
-    if (!alreadyPaid) toast("Purchase saved. You can find it under My Slips.");
+    submitButton.textContent = "Payment request sent";
+    toast("Check your phone and approve the payment prompt.");
   } catch (error) {
-    console.error("Create checkout purchase:", error);
-    toast(error.message?.includes("create_checkout_purchase")
-      ? "Purchase saving is not set up yet. Please contact support."
-      : (error.message || "Could not save this purchase. Please try again."));
+    console.error("SplashPay payment initiation:", error);
+    toast(error.message || "Could not start the payment. Please try again.");
     submitButton.disabled = false;
-    submitButton.textContent = "Try saving purchase again";
+    submitButton.textContent = "Try payment again";
   }
 });
 function countdownText(expiresAt) {
