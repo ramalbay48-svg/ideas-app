@@ -63,7 +63,7 @@ $("#checkoutForm").addEventListener("submit", async event => {
     return toast("Choose a payment method and enter a valid Tanzanian number.");
   }
   if (customerName.length < 2) return toast("Enter your full name.");
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(customerEmail)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
     return toast("Enter a valid email address.");
   }
 
