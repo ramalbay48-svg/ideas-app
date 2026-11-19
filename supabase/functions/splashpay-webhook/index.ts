@@ -145,6 +145,62 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Could not persist webhook event" }, 500);
   }
 
-  // Deliberately do not unlock a slip or mark a purchase paid in this phase.
-  return json({ success: true, received: true, processed: false });
+  // Reconcile only against a payment row created by our authenticated initiation function.
+  // The SQL function checks the exact TZS amount and updates the payment + purchase atomically.
+  const reconcileResponse = await fetch(
+    `${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/process_splashpay_payment`,
+    {
+      method: "POST",
+      headers: {
+        "apikey": serviceRoleKey,
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_reference: payment.reference,
+        p_amount: Number(payment.amount),
+        p_event: event,
+        p_payload: payload,
+      }),
+    },
+  );
+
+  if (!reconcileResponse.ok) {
+    const detail = await reconcileResponse.text();
+    await fetch(
+      `${supabaseUrl.replace(/\/$/, "")}/rest/v1/splashpay_webhook_events?event_id=eq.${encodeURIComponent(eventId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "apikey": serviceRoleKey,
+          "Authorization": `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ processing_error: detail.slice(0, 1000) }),
+      },
+    );
+    return json({ error: "Payment reconciliation failed" }, 500);
+  }
+
+  const reconciliation = await reconcileResponse.json();
+  if (!reconciliation?.matched) {
+    return json({ error: "Payment reference is not linked to a pending IDEAS APP purchase" }, 500);
+  }
+
+  await fetch(
+    `${supabaseUrl.replace(/\/$/, "")}/rest/v1/splashpay_webhook_events?event_id=eq.${encodeURIComponent(eventId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "apikey": serviceRoleKey,
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({ processed_at: new Date().toISOString(), processing_error: null }),
+    },
+  );
+
+  return json({ success: true, received: true, processed: true, payment: reconciliation });
 });
