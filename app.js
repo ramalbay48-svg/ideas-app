@@ -442,12 +442,63 @@ async function loadMarketplace() {
   }));
 }
 async function loadPurchasesPage(panel) {
-  if (!currentUser) { panel.innerHTML = '<h2>My slips</h2><p class="muted">Log in to see your purchases.</p><button class="primary-action" id="pageLogin">Log in</button>'; $("#pageLogin").onclick=()=>showAuth("login"); return; }
+  if (!currentUser) {
+    panel.innerHTML = '<h2>My slips</h2><p class="muted">Log in to see your purchases.</p><button class="primary-action" id="pageLogin">Log in</button>';
+    $("#pageLogin").onclick = () => showAuth("login");
+    return;
+  }
   panel.innerHTML = '<h2>My slips</h2><p class="muted">Loading your purchases…</p>';
-  const {data,error} = await db.from("purchases").select("id,status,amount_tzs,created_at,betslips(total_odds,betting_company,expires_at,tipsters(username))").eq("customer_id",currentUser.id).order("created_at",{ascending:false});
-  if (error) { panel.innerHTML='<h2>My slips</h2><p class="muted">Could not load purchases.</p>'; return; }
-  if (!data?.length) { panel.innerHTML='<h2>My slips</h2><div class="empty">You have not purchased any slips yet.</div>'; return; }
-  panel.innerHTML='<h2>My slips</h2>'+data.map(p=>'<article class="slip-card"><strong>'+escapeHtml(p.betslips?.betting_company||"Betslip")+'</strong><p class="muted">'+escapeHtml(p.betslips?.tipsters?.username||"Tipster")+' · Odds '+escapeHtml(p.betslips?.total_odds||"—")+'</p><p>'+money(p.amount_tzs)+' · '+escapeHtml(p.status)+'</p>'+(p.status==="paid"?'<p class="muted">Payment confirmed. Secure image access will appear when private storage is configured.</p>':'<p class="muted">Waiting for verified payment.</p>')+'</article>').join("");
+  const {data,error} = await db.from("purchases")
+    .select("id,status,amount_tzs,created_at,betslips(id,total_odds,betting_company,expires_at,tipsters(username))")
+    .eq("customer_id",currentUser.id)
+    .order("created_at",{ascending:false});
+  if (error) {
+    panel.innerHTML = '<h2>My slips</h2><p class="muted">Could not load purchases.</p>';
+    console.warn("My slips:", error.message);
+    return;
+  }
+  if (!data?.length) {
+    panel.innerHTML = '<h2>My slips</h2><div class="empty">You have not purchased any slips yet.</div>';
+    return;
+  }
+
+  // Private asset rows and Storage objects are only readable after the backend marks a purchase paid.
+  const paidSlipIds = [...new Set(data.filter(p => p.status === "paid" && p.betslips?.id).map(p => p.betslips.id))];
+  const assetUrls = new Map();
+  if (paidSlipIds.length) {
+    const {data:assets,error:assetError} = await db.from("slip_assets")
+      .select("slip_id,storage_path")
+      .in("slip_id",paidSlipIds);
+    if (assetError) {
+      console.warn("Purchased slip assets:", assetError.message);
+    } else {
+      await Promise.all((assets || []).map(async asset => {
+        const {data:signed,error:signedError} = await db.storage
+          .from("ideas-betslips")
+          .createSignedUrl(asset.storage_path,3600);
+        if (signedError) {
+          console.warn("Purchased slip image:", signedError.message);
+          return;
+        }
+        if (signed?.signedUrl) assetUrls.set(asset.slip_id,signed.signedUrl);
+      }));
+    }
+  }
+
+  panel.innerHTML = '<h2>My slips</h2>' + data.map(p => {
+    const slip = p.betslips || {};
+    const paid = p.status === "paid";
+    const imageUrl = paid && slip.id ? assetUrls.get(slip.id) : null;
+    const image = imageUrl
+      ? '<img alt="Your purchased betslip" src="' + escapeHtml(imageUrl) + '" style="width:100%;height:auto;max-height:720px;object-fit:contain;border-radius:12px;margin-top:12px">'
+      : (paid
+          ? '<p class="muted">Payment confirmed. The private image is not available yet; contact support if this continues.</p>'
+          : '<p class="muted">Waiting for verified payment. The betslip image remains locked.</p>');
+    return '<article class="slip-card"><strong>' + escapeHtml(slip.betting_company || "Betslip") +
+      '</strong><p class="muted">' + escapeHtml(slip.tipsters?.username || "Tipster") +
+      ' · Odds ' + escapeHtml(slip.total_odds || "—") + '</p><p>' + money(p.amount_tzs) +
+      ' · ' + (paid ? 'Payment confirmed' : escapeHtml(p.status)) + '</p>' + image + '</article>';
+  }).join("");
 }
 async function loadProfilePage(panel) {
   if (!currentUser) { panel.innerHTML='<h2>Your profile</h2><p class="muted">Log in or create an account to manage your profile.</p><button class="primary-action" id="profileLogin">Log in / Register</button>'; $("#profileLogin").onclick=()=>showAuth("register"); return; }
