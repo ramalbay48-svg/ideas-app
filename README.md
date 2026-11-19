@@ -1,9 +1,9 @@
 # IDEAS APP
 
-A mobile-first sports tipster marketplace prototype for Tanzania.
+A mobile-first sports tipster marketplace for Tanzania.
 
 ## Current stage
-This repository contains the first frontend foundation only. The marketplace uses clearly labelled demo content. Authentication, database storage, image uploads, payment initiation, payment verification, and slip unlocking are **not connected** yet.
+The customer frontend is connected to the IDEAS APP Supabase project. Checkout calls the `splashpay-initiate` Edge Function, and the `splashpay-webhook` function reconciles provider events before a purchase can be marked paid. The customer My Slips page requests a short-lived signed URL for a private betslip image only after the purchase is marked paid. These flows still require the private Storage bucket and RLS policies to be installed, the deployed functions and app build to match the repository, and a controlled end-to-end test. Do not treat the payment flow as production-ready until those checks pass.
 
 ## Approved product direction
 - Dark-first premium interface with neon-green accents and a light-mode option.
@@ -20,7 +20,7 @@ The next engineering stage is to add a real backend (Firebase Auth, Firestore, a
 
 ## Safety and release notes
 - Demo slips and prices are illustrative, not real betting advice.
-- No real payments are enabled.
+- Payment integration code is present, but live end-to-end payment and image-unlock behaviour have not yet been verified.
 - Do not deploy as a production betting/payment service until legal requirements, age restrictions, provider approval, security rules, and end-to-end tests have been completed.
 
 
