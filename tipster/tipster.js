@@ -117,10 +117,21 @@ $("resultSubmitForm").addEventListener("submit", async e => {
  }
 });
 
+
+async function archiveHistory(fn,id){
+ if(!confirm("Remove this item from your visible history? Customer purchases and payment records will be preserved."))return;
+ try{
+  const args=fn==="archive_ideas_betslip"?{p_slip_id:id}:{p_result_id:id};
+  const {error}=await client.rpc(fn,args);
+  if(error)throw error;
+  say("slipStatus","Removed from your visible history. Protected records were kept.");
+  await loadMySlips();
+ }catch(err){say("slipStatus",err.message||"Could not remove this history item.");}
+}
 async function loadMySlips(){
  const {data,error}=await client.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,status,created_at").eq("tipster_id",tipster.id).order("created_at",{ascending:false});
  if(error){$("mySlips").textContent="Could not load your listings: "+error.message;return;}
- const {data:reports,error:reportError}=await client.from("result_submissions").select("id,slip_id,submitted_result,status,created_at,review_reason").eq("submitted_by",user.id).order("created_at",{ascending:false});
+ const {data:reports,error:reportError}=await client.from("result_submissions").select("id,slip_id,submitted_result,status,created_at,review_reason,archived_at").eq("submitted_by",user.id).is("archived_at",null).order("created_at",{ascending:false});
  if(reportError){$("myResults").textContent="Could not load result reports: "+reportError.message;return;}
  const latestBySlip=new Map();
  (reports||[]).forEach(r=>{if(!latestBySlip.has(r.slip_id))latestBySlip.set(r.slip_id,r);});
