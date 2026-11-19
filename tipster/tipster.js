@@ -150,10 +150,12 @@ async function loadMySlips(){
  else{$("mySlips").innerHTML=data.map(s=>{
   const report=latestBySlip.get(s.id);
   const reportLabel=report?" · Result "+report.submitted_result.toUpperCase()+" ("+report.status+")":"";
-  return '<article class="record"><div class="record-head"><strong>'+esc(s.betting_company)+' · Odds '+esc(s.total_odds)+'</strong><span class="tag">'+esc(s.status)+'</span></div><small>TZS '+Number(s.price_tzs).toLocaleString("en-US")+' · Expires '+esc(new Date(s.expires_at).toLocaleString())+esc(reportLabel)+'</small></article>';
+  return '<article class="record"><div class="record-head"><strong>'+esc(s.betting_company)+' · Odds '+esc(s.total_odds)+'</strong><span class="tag">'+esc(s.status)+'</span></div><small>TZS '+Number(s.price_tzs).toLocaleString("en-US")+' · Expires '+esc(new Date(s.expires_at).toLocaleString())+esc(reportLabel)+'</small>'+(s.status!=="removed"?'<div class="record-actions"><button type="button" data-archive-slip="'+esc(s.id)+'">Remove from history</button></div>':'')+'</article>';
  }).join("");}
  if(!reports?.length){$("myResults").textContent="You have not submitted any result reports yet.";}
- else{$("myResults").innerHTML=reports.map(r=>'<article class="record"><div class="record-head"><strong>'+ (r.submitted_result==="won"?"🟢 WON":"🔴 LOST") +'</strong><span class="tag">'+esc(r.status.toUpperCase())+'</span></div><small>Submitted '+esc(new Date(r.created_at).toLocaleString())+'</small>'+(r.review_reason?'<p class="muted">Admin note: '+esc(r.review_reason)+'</p>':'')+'</article>').join("");}
+ else{$("myResults").innerHTML=reports.map(r=>'<article class="record"><div class="record-head"><strong>'+ (r.submitted_result==="won"?"🟢 WON":"🔴 LOST") +'</strong><span class="tag">'+esc(r.status.toUpperCase())+'</span></div><small>Submitted '+esc(new Date(r.created_at).toLocaleString())+'</small>'+(r.review_reason?'<p class="muted">Admin note: '+esc(r.review_reason)+'</p>':'')+'<div class="record-actions"><button type="button" data-archive-result="'+esc(r.id)+'">Remove from history</button></div></article>').join("");}
+ $("mySlips").querySelectorAll("[data-archive-slip]").forEach(b=>b.addEventListener("click",()=>archiveHistory("archive_ideas_betslip",b.dataset.archiveSlip)));
+ $("myResults").querySelectorAll("[data-archive-result]").forEach(b=>b.addEventListener("click",()=>archiveHistory("archive_ideas_result",b.dataset.archiveResult)));
 }
 $("logoutButton").addEventListener("click",async()=>{await client.auth.signOut();user=null;profile=null;tipster=null;$("workspace").classList.add("hidden");$("authPanel").classList.remove("hidden");$("authForm").reset();say("authStatus","You have logged out.");});
 client.auth.getSession().then(async({data})=>{if(data.session?.user){try{await enter(data.session.user);}catch(e){$("workspace").classList.add("hidden");$("authPanel").classList.remove("hidden");say("authStatus",e.message||"Could not load account.");}}});
