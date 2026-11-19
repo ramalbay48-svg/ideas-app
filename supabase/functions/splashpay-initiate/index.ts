@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
   if (!slipResponse.ok) return reply({ error: "Could not verify the betslip." }, 500);
   const slips = await slipResponse.json();
   const slip = slips?.[0];
-  if (!slip || slip.status !== "published" || new Date(slip.expires_at).getTime() <= Date.now()) {
+  if (!slip || slip.status !== "published" || slip.tipsters?.status !== "approved" || new Date(slip.expires_at).getTime() <= Date.now()) {
     return reply({ error: "This betslip is unavailable or expired." }, 404);
   }
   if (slip.tipsters?.user_id === user.id) return reply({ error: "You cannot buy your own betslip." }, 403);
