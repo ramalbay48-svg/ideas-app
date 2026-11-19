@@ -79,3 +79,17 @@ button,input{font:inherit}.topbar{height:66px;padding:0 max(20px,calc((100% - 90
 .tipster-result-dot{background:#00a85a;box-shadow:0 0 0 3px #00a85a22}
 .tipster-profile-follow{border-color:var(--line);background:var(--panel)}
 .follow-button[aria-pressed="true"]{background:#e5f5ea;color:#087a43;border-color:#a9d9ba}
+
+
+/* Featured banner carousel */
+.banner{padding-bottom:42px;transition:background-image .25s ease}
+.banner.has-image{background-color:#102319;background-repeat:no-repeat}
+.banner.has-image h2,.banner.has-image p{color:#fff;text-shadow:0 1px 3px #0008}
+.banner.has-image .banner-tag{color:#b8f5ce}
+.banner-content{position:relative;z-index:1;max-width:78%}
+.banner-dots{position:absolute;left:22px;bottom:17px;display:flex;align-items:center;gap:7px;z-index:2}
+.banner-dot{width:8px;height:8px;padding:0;border:0;border-radius:50%;background:#8aa394;opacity:.65;cursor:pointer}
+.banner-dot.active{width:22px;border-radius:8px;background:#008f4c;opacity:1}
+.banner.has-image .banner-dot{background:#fff8}
+.banner.has-image .banner-dot.active{background:#fff}
+@media(prefers-reduced-motion:reduce){.banner{transition:none}}
