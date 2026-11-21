@@ -141,7 +141,7 @@ async function openPaidPurchaseForSlip(slipId) {
   }
   $("#checkoutModal").close();
   selectedSlip = null;
-  showPage("profile");
+  showPage("purchases");
   const panel = $("#appPagePanel");
   await openPurchaseDetail(panel,data.id);
 }
@@ -164,7 +164,7 @@ async function waitForPaidPurchase(slipId, submitButton) {
       toast("Payment confirmed. Opening your betslip…");
       $("#checkoutModal").close();
       selectedSlip = null;
-      showPage("profile");
+      showPage("purchases");
       await openPurchaseDetail($("#appPagePanel"),data.id);
       return;
     }
@@ -186,7 +186,7 @@ async function waitForPaidPurchase(slipId, submitButton) {
     event.preventDefault();
     $("#checkoutModal").close();
     selectedSlip=null;
-    showPage("profile");
+    showPage("purchases");
     await loadPurchasesPage($("#appPagePanel"));
   };
 }
