@@ -83,9 +83,10 @@ $("#checkoutForm").addEventListener("submit", async event => {
     if (error) throw error;
     if (data?.already_paid) {
       $("#unlockPreview").innerHTML =
-        "<strong>This betslip is already purchased</strong><p>Your purchase is recorded as paid. Open My Slips to access it.</p>";
+        "<strong>This betslip is already purchased</strong><p>Opening your purchased betslip…</p>";
       $("#unlockPreview").hidden = false;
       submitButton.textContent = "Already purchased";
+      await openPaidPurchaseForSlip(selectedSlip.id);
       return;
     }
     if (!data?.success || !data?.reference) {
@@ -95,12 +96,11 @@ $("#checkoutForm").addEventListener("submit", async event => {
     $("#unlockPreview").innerHTML =
       "<strong>Payment prompt sent to your phone</strong>" +
       "<p>" + escapeHtml(provider) + " · +255 " + escapeHtml(phone) +
-      ". Approve the request on your mobile money phone. Reference: " +
-      escapeHtml(data.reference) +
-      ". Your betslip remains locked until SplashPay confirms success.</p>";
+      ". Approve the request on your mobile money phone. Your betslip stays locked until SplashPay verifies payment. We will open it automatically after confirmation.</p><p id=\"paymentWaitStatus\">Waiting for payment confirmation…</p>";
     $("#unlockPreview").hidden = false;
-    submitButton.textContent = "Payment request sent";
-    toast("Check your phone and approve the payment prompt.");
+    submitButton.textContent = "Waiting for confirmation…";
+    toast("Approve the payment prompt on your phone.");
+    await waitForPaidPurchase(selectedSlip.id, submitButton);
   } catch (error) {
     console.error("SplashPay payment initiation:", error);
     toast(error.message || "Could not start the payment. Please try again.");
@@ -108,6 +108,88 @@ $("#checkoutForm").addEventListener("submit", async event => {
     submitButton.textContent = "Try payment again";
   }
 });
+async function openPurchaseDetail(panel,purchaseId) {
+  if(!currentUser || !panel || !purchaseId)return;
+  panel.innerHTML='<h2>Purchased betslip</h2><p class="muted">Loading your private betslip…</p>';
+  const {data:p,error}=await db.from("purchases")
+    .select("id,status,amount_tzs,created_at,paid_at,slip_id,betslips(id,total_odds,betting_company,expires_at,tipsters(username))")
+    .eq("id",purchaseId).eq("customer_id",currentUser.id).maybeSingle();
+  if(error || !p){panel.innerHTML='<h2>Purchased betslip</h2><p class="muted">Could not open this purchase. Please try again.</p><button class="secondary-action" id="backToPurchases">Back to My Purchases</button>';$("#backToPurchases").onclick=()=>loadPurchasesPage(panel);return;}
+  if(p.status!=="paid"){panel.innerHTML='<h2>Purchased betslip</h2><p class="muted">Payment is not confirmed yet. This slip is still locked.</p><button class="secondary-action" id="backToPurchases">Back to My Purchases</button>';$("#backToPurchases").onclick=()=>loadPurchasesPage(panel);return;}
+  const slip=p.betslips||{};
+  const {data:asset,error:assetError}=await db.from("slip_assets").select("storage_path").eq("slip_id",p.slip_id).maybeSingle();
+  let image="";
+  if(!assetError && asset?.storage_path){
+    const {data:signed,error:signedError}=await db.storage.from("ideas-betslips").createSignedUrl(asset.storage_path,3600);
+    if(!signedError && signed?.signedUrl)image='<img alt="Your purchased betslip" src="'+escapeHtml(signed.signedUrl)+'" style="width:100%;height:auto;max-height:760px;object-fit:contain;border-radius:12px;margin-top:14px">';
+  }
+  const expired=slip.expires_at && new Date(slip.expires_at).getTime()<=Date.now();
+  panel.innerHTML='<button type="button" class="secondary-action" id="backToPurchases">← Back to My Purchases</button><h2>Purchased betslip</h2><article class="slip-card"><strong>'+escapeHtml(slip.betting_company||"Betslip")+'</strong><p class="muted">@'+escapeHtml(slip.tipsters?.username||"Tipster")+' · Odds '+escapeHtml(slip.total_odds||"—")+'</p><p>'+money(p.amount_tzs)+' · Payment confirmed</p><p class="muted">'+(expired?'This slip has expired in the marketplace. Your purchase is still saved.':'Purchased successfully')+'</p>'+(image||'<p class="muted">The private image is not available yet. Contact support if this continues.</p>')+'</article>';
+  $("#backToPurchases").onclick=()=>loadPurchasesPage(panel);
+}
+async function openPaidPurchaseForSlip(slipId) {
+  if (!currentUser || !slipId) return;
+  const {data,error} = await db.from("purchases")
+    .select("id,status")
+    .eq("customer_id",currentUser.id)
+    .eq("slip_id",slipId)
+    .eq("status","paid")
+    .maybeSingle();
+  if (error || !data) {
+    toast("Payment is confirmed. Open My Purchases to view your slip.");
+    return;
+  }
+  $("#checkoutModal").close();
+  selectedSlip = null;
+  showPage("profile");
+  const panel = $("#appPagePanel");
+  await openPurchaseDetail(panel,data.id);
+}
+async function waitForPaidPurchase(slipId, submitButton) {
+  const started = Date.now();
+  const timeoutMs = 180000;
+  while (Date.now() - started < timeoutMs) {
+    await new Promise(resolve => setTimeout(resolve,3000));
+    if (!currentUser) return;
+    const {data,error} = await db.from("purchases")
+      .select("id,status")
+      .eq("customer_id",currentUser.id)
+      .eq("slip_id",slipId)
+      .maybeSingle();
+    if (error) {
+      console.warn("Payment confirmation check:",error.message);
+      continue;
+    }
+    if (data?.status === "paid") {
+      toast("Payment confirmed. Opening your betslip…");
+      $("#checkoutModal").close();
+      selectedSlip = null;
+      showPage("profile");
+      await openPurchaseDetail($("#appPagePanel"),data.id);
+      return;
+    }
+    if (data?.status === "failed" || data?.status === "refunded") {
+      const statusNode=$("#paymentWaitStatus");
+      if(statusNode)statusNode.textContent="Payment was not completed. You can check My Purchases or try again.";
+      submitButton.disabled=false;
+      submitButton.textContent="Try payment again";
+      return;
+    }
+    const statusNode=$("#paymentWaitStatus");
+    if(statusNode)statusNode.textContent="Still waiting for SplashPay confirmation…";
+  }
+  const statusNode=$("#paymentWaitStatus");
+  if(statusNode)statusNode.textContent="We have not received confirmation yet. If you approved payment, check My Purchases; your slip unlocks only after verified confirmation.";
+  submitButton.disabled=false;
+  submitButton.textContent="Check My Purchases";
+  submitButton.onclick=async event=>{
+    event.preventDefault();
+    $("#checkoutModal").close();
+    selectedSlip=null;
+    showPage("profile");
+    await loadPurchasesPage($("#appPagePanel"));
+  };
+}
 function countdownText(expiresAt) {
   const remaining = new Date(expiresAt).getTime() - Date.now();
   if (!Number.isFinite(remaining) || remaining <= 0) return "Expired";
@@ -181,9 +263,18 @@ document.querySelectorAll(".filter").forEach(button => button.addEventListener("
   activeCompany = button.dataset.company;
   loadMarketplace();
 }));
+function applyTheme(mode) {
+  const dark = mode === "dark";
+  document.documentElement.classList.toggle("dark", dark);
+  localStorage.setItem("ideas-app-theme", dark ? "dark" : "light");
+  $("#themeToggle").textContent = dark ? "☾" : "☼";
+  $("#themeToggle").setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+  $("#themeToggle").title = dark ? "Switch to light mode" : "Switch to dark mode";
+  $('meta[name="theme-color"]').content = dark ? "#0D0D0D" : "#f5f8f6";
+}
+applyTheme(localStorage.getItem("ideas-app-theme") === "dark" ? "dark" : "light");
 $("#themeToggle").addEventListener("click", () => {
-  document.documentElement.classList.toggle("light");
-  $('meta[name="theme-color"]').content = document.documentElement.classList.contains("light") ? "#f5f7f5" : "#0D0D0D";
+  applyTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
 });
 $("#searchInput").addEventListener("input", loadMarketplace);
 
@@ -485,20 +576,20 @@ async function loadPurchasesPage(panel) {
     }
   }
 
-  panel.innerHTML = '<h2>My slips</h2>' + data.map(p => {
+  panel.innerHTML = '<h2>My Purchases</h2><p class="muted">Your paid slips remain saved here even after their marketplace expiry time.</p>' + data.map(p => {
     const slip = p.betslips || {};
     const paid = p.status === "paid";
-    const imageUrl = paid && slip.id ? assetUrls.get(slip.id) : null;
-    const image = imageUrl
-      ? '<img alt="Your purchased betslip" src="' + escapeHtml(imageUrl) + '" style="width:100%;height:auto;max-height:720px;object-fit:contain;border-radius:12px;margin-top:12px">'
-      : (paid
-          ? '<p class="muted">Payment confirmed. The private image is not available yet; contact support if this continues.</p>'
-          : '<p class="muted">Waiting for verified payment. The betslip image remains locked.</p>');
+    const expired = slip.expires_at && new Date(slip.expires_at).getTime() <= Date.now();
     return '<article class="slip-card"><strong>' + escapeHtml(slip.betting_company || "Betslip") +
       '</strong><p class="muted">' + escapeHtml(slip.tipsters?.username || "Tipster") +
       ' · Odds ' + escapeHtml(slip.total_odds || "—") + '</p><p>' + money(p.amount_tzs) +
-      ' · ' + (paid ? 'Payment confirmed' : escapeHtml(p.status)) + '</p>' + image + '</article>';
+      ' · ' + (paid ? 'Payment confirmed' : escapeHtml(p.status)) +
+      (expired ? ' · Expired in marketplace' : '') + '</p>' +
+      (paid ? '<button type="button" class="primary-action" data-open-purchase="' + escapeHtml(p.id) + '">Open purchased betslip</button>' :
+       '<p class="muted">The betslip stays locked until payment is confirmed.</p>') +
+      '</article>';
   }).join("");
+  panel.querySelectorAll("[data-open-purchase]").forEach(button => button.addEventListener("click",()=>openPurchaseDetail(panel,button.dataset.openPurchase)));
 }
 async function loadProfilePage(panel) {
   if (!currentUser) { panel.innerHTML='<h2>Your profile</h2><p class="muted">Log in or create an account to manage your profile.</p><button class="primary-action" id="profileLogin">Log in / Register</button>'; $("#profileLogin").onclick=()=>showAuth("register"); return; }
