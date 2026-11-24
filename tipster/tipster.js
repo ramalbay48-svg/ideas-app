@@ -13,21 +13,23 @@ say("connectionStatus","Database connection ready.");
 document.querySelectorAll("[data-mode]").forEach(b=>b.addEventListener("click",()=>{mode=b.dataset.mode;document.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("active",x===b));$("authHeading").textContent=mode==="register"?"Create your IDEAS APP account":"Sign in to your account";$("authButton").textContent=mode==="register"?"Create account":"Log in";say("authStatus","");}));
 $("authForm").addEventListener("submit",async e=>{e.preventDefault();const raw=$("phone").value.replace(/\D/g,"");if(!/^[67]\d{8}$/.test(raw))return say("authStatus","Enter 9 digits after +255.");const b=$("authButton");b.disabled=true;say("authStatus","Please wait…");try{let data,error;if(mode==="register"){({data,error}=await client.auth.signUp({email:alias(raw),password:$("password").value,options:{data:{phone:"+255"+raw}}}));if(error)throw error;if(!data.session){say("authStatus","Account created. Email confirmation must be OFF to continue without an SMS code.");return;}}else{({data,error}=await client.auth.signInWithPassword({email:alias(raw),password:$("password").value}));if(error)throw error;}await enter(data.user);}catch(err){say("authStatus",err.message||"Could not sign in.");}finally{b.disabled=false;}});
 async function enter(authUser){user=authUser;const {data:p,error:e}=await client.from("profiles").select("id,phone,display_name,avatar_path,role").eq("id",user.id).maybeSingle();if(e)throw e;if(!p)throw new Error("Account profile not found.");profile=p;if(p.role==="admin")throw new Error("Use the IDEAS APP Management app for administrator tasks.");$("authPanel").classList.add("hidden");$("workspace").classList.remove("hidden");$("welcomeTitle").textContent="Welcome"+(p.display_name?", "+p.display_name:"");$("accountPhone").textContent=p.phone||user.email||"IDEAS APP account";$("roleLabel").textContent=String(p.role||"customer").toUpperCase()+" · TIPSTER APP";await refreshApplication();}
-async function refreshApplication(){const {data,error}=await client.from("tipsters").select("id,username,bio,status").eq("user_id",user.id).maybeSingle();if(error)throw error;tipster=data;["applyPanel","statusPanel","tipsterPanel"].forEach(id=>$(id).classList.add("hidden"));if(!tipster){$("applyPanel").classList.remove("hidden");return;}$("statusPanel").classList.remove("hidden");$("statusTag").textContent=String(tipster.status).toUpperCase();$("statusHeading").textContent=tipster.status==="approved"?"You are approved":tipster.status==="rejected"?"Application not approved":"Application received";$("statusMessage").textContent=tipster.status==="approved"?"Your profile is active. Edit your details and publish slips below.":tipster.status==="rejected"?"Your application was not approved. Please contact the administrator.":"Your application is waiting for administrator review.";if(tipster.status==="approved"&&profile.role==="tipster"){$("tipsterPanel").classList.remove("hidden");$("tipsterHeading").textContent="@"+tipster.username+" workspace";renderProfileEditor();await loadMySlips();setupTipsterSections();}}
+async function refreshApplication(){const {data,error}=await client.from("tipsters").select("id,username,bio,status").eq("user_id",user.id).maybeSingle();if(error)throw error;tipster=data;["applyPanel","statusPanel","tipsterPanel"].forEach(id=>$(id).classList.add("hidden"));if(!tipster){$("applyPanel").classList.remove("hidden");return;}$("statusPanel").classList.remove("hidden");$("statusTag").textContent=String(tipster.status).toUpperCase();$("statusHeading").textContent=tipster.status==="approved"?"You are approved":tipster.status==="rejected"?"Application not approved":"Application received";$("statusMessage").textContent=tipster.status==="approved"?"Your profile is active. Edit your details and publish slips below.":tipster.status==="rejected"?"Your application was not approved. Please contact the administrator.":"Your application is waiting for administrator review.";if(tipster.status==="approved"&&profile.role==="tipster"){$("tipsterPanel").classList.remove("hidden");$("tipsterHeading").textContent="@"+tipster.username+" workspace";renderProfileEditor();await loadMySlips();await loadMySales();setupTipsterSections();}}
 function setupTipsterSections(){
  const tipsterPanel=$("tipsterPanel");
+ let salesBox=$("mySales");if(!salesBox){salesBox=document.createElement("div");salesBox.id="mySales";salesBox.className="records";}
  const nodes=[
   ["profileSection","My public profile",$("profileEditor")],
   ["publishSection","Publish a betslip",$("slipForm")],
   ["slipsSection","My betslips",$("mySlips")],
   ["reportSection","Report a settled result",$("resultSubmitForm")],
-  ["reportsSection","Your result reports",$("myResults")]
+  ["reportsSection","Your result reports",$("myResults")],
+  ["salesSection","Sales & Transactions",salesBox]
  ];
  if(nodes.some(x=>!x[2]))return;
  let nav=$("tipsterSectionNav");
  if(!nav){
   nav=document.createElement("nav");nav.id="tipsterSectionNav";nav.className="tipster-shortcuts";nav.setAttribute("aria-label","Tipster workspace sections");
-  nav.innerHTML='<button type="button" data-target="profileSection">My Profile</button><button type="button" data-target="publishSection">Publish Betslip</button><button type="button" data-target="slipsSection">My Betslips</button><button type="button" data-target="reportSection">Report Result</button><button type="button" data-target="reportsSection">Result Reports</button>';
+  nav.innerHTML='<button type="button" data-target="profileSection">My Profile</button><button type="button" data-target="publishSection">Publish Betslip</button><button type="button" data-target="slipsSection">My Betslips</button><button type="button" data-target="reportSection">Report Result</button><button type="button" data-target="reportsSection">Result Reports</button><button type="button" data-target="salesSection">Sales & Transactions</button>';
   tipsterPanel.querySelector(".panel-heading").insertAdjacentElement("afterend",nav);
  }
  nodes.forEach(([id,title,node])=>{
@@ -127,6 +129,20 @@ async function archiveHistory(fn,id){
   say("slipStatus","Removed from your visible history. Protected records were kept.");
   await loadMySlips();
  }catch(err){say("slipStatus",err.message||"Could not remove this history item.");}
+}
+async function loadMySales(){
+ const box=$("mySales");if(!box)return;
+ box.innerHTML='<p class="muted">Loading confirmed sales…</p>';
+ try{
+  const {data,error}=await client.rpc("get_my_tipster_sales");
+  if(error)throw error;
+  const rows=data||[];
+  const total=rows.reduce((sum,r)=>sum+Number(r.amount_tzs||0),0);
+  const slips=new Map();
+  rows.forEach(r=>{const key=r.slip_id;if(!slips.has(key))slips.set(key,{company:r.betting_company,odds:r.total_odds,count:0,revenue:0,rows:[]});const s=slips.get(key);s.count++;s.revenue+=Number(r.amount_tzs||0);s.rows.push(r);});
+  box.innerHTML='<div class="record"><div class="record-head"><strong>Confirmed paid sales</strong><span class="tag">'+rows.length+' SALES</span></div><p class="subheading">TZS '+total.toLocaleString("en-US")+'</p><small>Only verified paid purchases are included. Pending, failed and refunded purchases are excluded.</small></div>'+
+   (slips.size?[...slips.entries()].map(([id,s])=>'<article class="record"><div class="record-head"><strong>'+esc(s.company)+' · Odds '+esc(s.odds)+'</strong><span class="tag">'+s.count+' sold</span></div><p><strong>TZS '+s.revenue.toLocaleString("en-US")+'</strong> total sales</p><small>Slip ID: '+esc(id)+'</small><div class="records">'+s.rows.map(r=>'<div class="record"><strong>TZS '+Number(r.amount_tzs).toLocaleString("en-US")+'</strong><small>Paid '+esc(r.paid_at?new Date(r.paid_at).toLocaleString():"Date unavailable")+'</small><span class="tag">PAID</span></div>').join("")+'</div></article>').join(""):'<p class="muted">No confirmed purchases for your slips yet.</p>');
+ }catch(err){box.innerHTML='<p class="error">Could not load sales: '+esc(err.message||"Please try again.")+'</p>';}
 }
 async function loadMySlips(){
  const {data,error}=await client.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,status,created_at").eq("tipster_id",tipster.id).order("created_at",{ascending:false});
