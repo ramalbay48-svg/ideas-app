@@ -1,0 +1,48 @@
+name: Deploy IDEAS APP Customer Website
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: customer-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out customer app
+        uses: actions/checkout@v4
+
+      - name: Prepare customer-only website
+        run: |
+          mkdir -p _site/assets
+          cp index.html app.js styles.css _site/
+          cp assets/ideas-app-icon.svg _site/assets/
+          touch _site/.nojekyll
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload customer website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Publish customer website
+        id: deployment
+        uses: actions/deploy-pages@v4
