@@ -421,8 +421,8 @@ async function getApprovedTipsters() {
 }
 function tipsterCard(t) {
   const name=t.profiles?.display_name||t.username||"Tipster";
-  const avatar=t.profiles?.avatar_path?'<img alt="" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':escapeHtml(name.charAt(0).toUpperCase());
-  return '<article class="tipster"><div class="tipster-avatar">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>@'+escapeHtml(t.username)+'</small><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
+  const avatar=t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':'<span>'+escapeHtml(name.charAt(0).toUpperCase())+'</span>';
+  return '<article class="tipster"><button type="button" class="tipster-card-open" data-open-tipster="'+escapeHtml(t.id)+'" aria-label="Open '+escapeHtml(name)+' profile"><div class="tipster-card-photo">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>Accuracy · Admin verified</small></button><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
 }
 async function loadHomeTipsters() {
   const rows=await getApprovedTipsters();
@@ -461,21 +461,35 @@ async function loadTipstersPage(panel) {
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
   const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
-  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-profile-follow"><strong>' + Number(tipster.followers_count||0).toLocaleString() + ' followers</strong>' + followButton(tipster.id,tipster.is_following) + '</div><div class="tipster-results-wrap"><strong class="tipster-results-title">Recent results</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div></div><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
+  const avatar = tipster.profiles?.avatar_path ? '<img alt="Profile picture of '+escapeHtml(displayName)+'" src="'+escapeHtml(publicAvatar(tipster.profiles.avatar_path))+'">' : '<span>'+escapeHtml(displayName.charAt(0).toUpperCase())+'</span>';
+  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><section class="tipster-profile-hero"><div class="tipster-profile-cover">'+avatar+'</div><h2>' + escapeHtml(displayName) + ' <span class="verified-mark">✓</span></h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-profile-follow"><strong>' + Number(tipster.followers_count||0).toLocaleString() + ' followers</strong>' + followButton(tipster.id,tipster.is_following) + '</div><p class="tipster-profile-bio">' + escapeHtml(tipster.bio || "No profile description yet.") + '</p></section><div class="tipster-results-wrap"><strong class="tipster-results-title">Last 10 consecutive verified slips</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div><p id="tipsterAccuracy" class="tipster-accuracy">Calculating performance…</p></div><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
   $("#backToTipsters").addEventListener("click", () => loadTipstersPage(panel));
   wireFollowButtons(panel);
   const {data: verifiedRows, error: verifiedError} = await db.from("public_verified_results")
     .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
-    .eq("tipster_id", tipster.id).order("reviewed_at", {ascending:false}).limit(30);
+    .eq("tipster_id", tipster.id).order("reviewed_at", {ascending:false}).limit(40);
   const verifiedRoot = $("#tipsterVerifiedResults");
   if (verifiedRoot) {
     if (verifiedError) {
       console.warn("Tipster verified results:", verifiedError.message);
       verifiedRoot.innerHTML = '<div class="empty">Verified results are temporarily unavailable.</div>';
-    } else if (!verifiedRows?.length) {
-      verifiedRoot.innerHTML = '<div class="empty">No administrator-verified results yet.</div>';
+      $("#tipsterAccuracy").textContent = "Performance unavailable";
     } else {
-      verifiedRoot.innerHTML = verifiedRows.slice(0,6).map(result => verifiedResultRow(result)).join("");
+      const seen = new Set();
+      const lastTen = (verifiedRows || []).filter(row => {
+        if (!row.slip_id || seen.has(row.slip_id)) return false;
+        seen.add(row.slip_id);
+        return true;
+      }).slice(0,10);
+      if (!lastTen.length) {
+        verifiedRoot.innerHTML = '<div class="empty">No administrator-verified results yet.</div>';
+        $("#tipsterAccuracy").textContent = "No verified performance yet";
+      } else {
+        const wins = lastTen.filter(row => row.submitted_result === "won").length;
+        const accuracy = Math.round((wins / lastTen.length) * 100);
+        verifiedRoot.innerHTML = lastTen.map(result => verifiedResultRow(result)).join("");
+        $("#tipsterAccuracy").textContent = accuracy + "% accuracy · " + wins + " wins from " + lastTen.length + " consecutive slips";
+      }
     }
   }
   const {data, error} = await db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at").eq("tipster_id", tipster.id).eq("status", "published").gt("expires_at", new Date().toISOString()).order("created_at", {ascending:false});
