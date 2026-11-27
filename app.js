@@ -239,6 +239,7 @@ function showPage(page, skipTipsterListLoad = false) {
   }
   panel.hidden = page === "home";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("selected", b.dataset.view === page));
+  if (page === "betslips") loadMarketplace();
   if (page === "tipsters" && !skipTipsterListLoad) loadTipstersPage(panel);
   if (page === "following") loadFollowingPage(panel);
   if (page === "profile") loadProfilePage(panel);
