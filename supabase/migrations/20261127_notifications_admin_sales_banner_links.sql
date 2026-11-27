@@ -126,4 +126,12 @@ $$;
 revoke all on function public.admin_get_all_sales_transactions() from public, anon;
 grant execute on function public.admin_get_all_sales_transactions() to authenticated;
 
+DO $
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.customer_notifications;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END;
+$;
+
 commit;
