@@ -118,3 +118,23 @@ button,input{font:inherit}.topbar{height:66px;padding:0 max(20px,calc((100% - 90
 :root.dark .tipster-profile-follow{border-color:var(--line);background:var(--panel)}
 :root.dark .notice{background:var(--panel)}
 :root.dark .banner-dot.active{background:#00e676}
+
+/* IDEAS APP refresh: image-led tipster cards and profile, using the existing brand palette */
+.tipster-row{display:flex;gap:12px;overflow-x:auto;padding:2px 1px 10px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.tipster-row::-webkit-scrollbar{display:none}
+.tipster{flex:0 0 46%;max-width:210px;scroll-snap-align:start;padding:9px;border-radius:16px;text-align:left}
+.tipster-card-open{display:block;width:100%;padding:0;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
+.tipster-card-photo{height:118px;overflow:hidden;border-radius:12px;margin-bottom:9px;background:linear-gradient(145deg,#163d29,#0d0d0d);display:grid;place-items:center;color:#00e676;font-size:32px;font-weight:900}
+.tipster-card-photo img{width:100%;height:100%;object-fit:cover}
+.tipster-card-open strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tipster-card-open small{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.tipster .follow-button,.tipster .tipster-view-button{width:100%;margin-top:8px}
+.tipster-profile-hero{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:0 14px 14px;text-align:center}
+.tipster-profile-cover{height:190px;margin:0 -14px 12px;background:linear-gradient(145deg,#143b27,#0d0d0d);display:grid;place-items:center;overflow:hidden}
+.tipster-profile-cover img{width:100%;height:100%;object-fit:cover}
+.tipster-profile-cover span{font-size:64px;color:#00e676;font-weight:900}
+.tipster-profile-hero h2{margin:5px 0;font-size:21px}
+.tipster-profile-bio{color:var(--muted);font-size:12px;margin:10px 0 0}
+.tipster-accuracy{font-size:11px;color:var(--green);font-weight:750;margin:8px 0}
+.tipster-results{gap:8px;flex-wrap:nowrap;overflow-x:auto;padding:5px 2px}
+.tipster-result-row{flex:0 0 18px}
