@@ -138,3 +138,10 @@ button,input{font:inherit}.topbar{height:66px;padding:0 max(20px,calc((100% - 90
 .tipster-accuracy{font-size:11px;color:var(--green);font-weight:750;margin:8px 0}
 .tipster-results{gap:8px;flex-wrap:nowrap;overflow-x:auto;padding:5px 2px}
 .tipster-result-row{flex:0 0 18px}
+
+/* Betslip detail page */
+.slip-detail-card{margin-top:14px;padding:15px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+.slip-detail-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.slip-detail-preview{height:min(52vh,420px);margin:16px 0}
+.slip-detail-buy{width:100%;padding:13px;font-size:13px}
+.home-search{margin:18px 0 8px}
