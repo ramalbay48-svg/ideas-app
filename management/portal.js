@@ -60,6 +60,7 @@
       ["Verify Results", "resultsPanel"],
       ["Activity Log", "auditPanel"],
       ["Manage Profiles", "managedTipstersPanel"],
+      ["Sales & Transactions", "adminSalesPanel"],
       ["Top & Trending", "rankingsPanel"],
       ["Manage History", "historyManagementPanel"],
       ["Create Banner", "bannerSectionPanel"]
@@ -133,8 +134,9 @@
       tools.id = "adminToolsPanel";
       $("workspace").appendChild(tools);
     }
-    tools.innerHTML = '<section class="panel dashboard-section" id="managedTipstersPanel"><div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div></section><section class="panel dashboard-section" id="rankingsPanel"><div class="panel-heading"><div><p class="eyebrow">PERFORMANCE</p><h3>Tipster rankings</h3></div></div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div></section><section class="panel dashboard-section" id="historyManagementPanel"><div class="panel-heading"><div><p class="eyebrow">RECORD MANAGEMENT</p><h3>Manage betslip history</h3></div></div><div id="historyBetslips" class="records">Loading betslips…</div></section><section class="panel dashboard-section" id="bannerSectionPanel"><div class="panel-heading"><div><p class="eyebrow">CUSTOMER APP</p><h3 id="bannerSection">Create or manage banners</h3></div></div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div></section>';
+    tools.innerHTML = '<section class="panel dashboard-section" id="adminSalesPanel"><div class="panel-heading"><div><p class="eyebrow">REVENUE CONTROL</p><h3>Sales & Transactions</h3></div><span class="tag">ADMIN ONLY</span></div><p class="muted">All purchases and payment attempts, grouped by tipster. Only the IDEAS APP owner/admin manages withdrawals.</p><div id="adminSalesSummary" class="leaderboard-grid"></div><div id="adminSalesList" class="records">Loading transactions…</div></section><section class="panel dashboard-section" id="managedTipstersPanel"><div class="panel-heading"><div><p class="eyebrow">ADMIN CONTROLS</p><h3>Manage tipster profiles</h3></div></div><div id="managedTipsters" class="records">Loading tipsters…</div></section><section class="panel dashboard-section" id="rankingsPanel"><div class="panel-heading"><div><p class="eyebrow">PERFORMANCE</p><h3>Tipster rankings</h3></div></div><div class="leaderboard-grid"><section class="leaderboard"><h4>Top Winning Tipsters</h4><div id="topWinningTipsters" class="leaderboard-list">Loading verified results…</div></section><section class="leaderboard"><h4>Trending Tipsters · Last 7 Days</h4><div id="trendingTipsters" class="leaderboard-list">Loading recent activity…</div></section></div></section><section class="panel dashboard-section" id="historyManagementPanel"><div class="panel-heading"><div><p class="eyebrow">RECORD MANAGEMENT</p><h3>Manage betslip history</h3></div></div><div id="historyBetslips" class="records">Loading betslips…</div></section><section class="panel dashboard-section" id="bannerSectionPanel"><div class="panel-heading"><div><p class="eyebrow">CUSTOMER APP</p><h3 id="bannerSection">Create or manage banners</h3></div></div><form id="bannerForm"><label>Banner title</label><input id="bannerTitle" maxlength="80" required><label>Banner message</label><textarea id="bannerMessage" maxlength="240" rows="2" required></textarea><label for="bannerImageFile">Banner picture from gallery (JPG, PNG or WebP, max 5 MB)</label><input id="bannerImageFile" type="file" accept="image/jpeg,image/png,image/webp"><div id="bannerImagePreview" class="banner-image-preview">No banner picture selected.</div><label for="bannerImage">Or image URL (optional)</label><input id="bannerImage" type="url" placeholder="https://…"><label for="bannerRedirectUrl">Instagram page URL (optional)</label><input id="bannerRedirectUrl" type="url" placeholder="https://www.instagram.com/yourpage/"><label><input id="bannerActive" type="checkbox" checked> Show this banner in Customer App</label><button class="primary">Save banner</button></form><p class="hint" id="bannerStatus"></p><div id="bannerList" class="records">Loading banners…</div></section>';
     await loadManagedTipsters();
+    await loadAdminSales();
     await loadTipsterLeaderboards();
     await loadBanners();
     await loadHistoryBetslips();
@@ -154,6 +156,22 @@
     $("bannerImage").addEventListener("input", () => {
       if (!$("bannerImageFile").files?.length) previewBannerImage($("bannerImage").value.trim());
     });
+  }
+
+  async function loadAdminSales() {
+    const root=$("adminSalesList"),summary=$("adminSalesSummary");
+    if(!root||!summary)return;
+    root.textContent="Loading all sales and payment transactions…";
+    const {data,error:e}=await client.rpc("admin_get_all_sales_transactions");
+    if(e){root.textContent="Could not load sales: "+e.message;return;}
+    const rows=data||[];
+    const paid=rows.filter(r=>r.purchase_status==="paid");
+    const revenue=paid.reduce((sum,r)=>sum+Number(r.amount_tzs||0),0);
+    const grouped=new Map();
+    rows.forEach(r=>{const key=r.tipster_id||"unknown";if(!grouped.has(key))grouped.set(key,{username:r.username||"Unknown tipster",name:r.display_name||"",rows:[],paid:0,revenue:0});const g=grouped.get(key);g.rows.push(r);if(r.purchase_status==="paid"){g.paid++;g.revenue+=Number(r.amount_tzs||0);}});
+    summary.innerHTML='<article class="record"><strong>'+paid.length+' paid purchases</strong><p>TZS '+revenue.toLocaleString("en-US")+'</p></article><article class="record"><strong>'+rows.length+' transaction records</strong><p>'+grouped.size+' tipsters</p></article>';
+    if(!rows.length){root.textContent="No payment transactions have been recorded yet.";return;}
+    root.innerHTML=[...grouped.values()].map(g=>'<article class="record"><div class="record-head"><strong>'+esc(g.name||g.username)+' · @'+esc(g.username)+'</strong><span class="tag">'+g.paid+' PAID</span></div><p><strong>TZS '+g.revenue.toLocaleString("en-US")+'</strong> confirmed sales</p><div class="records">'+g.rows.map(r=>'<div class="record"><div class="record-head"><strong>'+esc(r.betting_company||"Betslip")+' · TZS '+Number(r.amount_tzs||0).toLocaleString("en-US")+'</strong><span class="tag">'+esc((r.purchase_status||"unknown").toUpperCase())+'</span></div><small>Purchase: '+esc(r.purchase_id)+' · Slip: '+esc(r.slip_id)+'</small><small>Customer: '+esc(r.customer_name||"—")+' · '+esc(r.customer_phone||"—")+'</small><small>Provider: '+esc(r.provider||"—")+' · Payment: '+esc((r.payment_status||"—").toUpperCase())+'</small><small>Reference: '+esc(r.provider_reference||"—")+'</small><small>Date: '+esc(r.paid_at?new Date(r.paid_at).toLocaleString():new Date(r.purchase_created_at).toLocaleString())+'</small></div>').join("")+'</div></article>').join("");
   }
 
   async function loadManagedTipsters() {
@@ -245,11 +263,11 @@
 
   async function loadBanners() {
     const root=$("bannerList");
-    const {data,error:e}=await client.from("announcements").select("id,title,message,image_url,active").order("created_at",{ascending:false});
+    const {data,error:e}=await client.from("announcements").select("id,title,message,image_url,redirect_url,active").order("created_at",{ascending:false});
     if(e){root.textContent="Could not load banners: "+e.message;return;}
     if(!data?.length){root.textContent="No banners created yet.";return;}
     root.innerHTML=data.map(a=>'<article class="record"><div class="record-head"><strong>'+esc(a.title)+'</strong><span class="tag">'+(a.active?"ACTIVE":"HIDDEN")+'</span></div>'+(a.image_url?'<img class="banner-list-image" alt="Banner image" src="'+esc(a.image_url)+'">':'')+'<p class="muted">'+esc(a.message)+'</p><div class="record-actions"><button class="approve" data-edit-banner="'+a.id+'">Edit</button><button class="reject" data-delete-banner="'+a.id+'">Delete</button></div></article>').join("");
-    root.querySelectorAll("[data-edit-banner]").forEach(b=>b.addEventListener("click",()=>{const a=data.find(x=>x.id===b.dataset.editBanner);$("bannerTitle").value=a.title;$("bannerMessage").value=a.message;$("bannerImage").value=a.image_url||"";$("bannerImageFile").value="";previewBannerImage(a.image_url||"");$("bannerActive").checked=a.active;$("bannerForm").dataset.editId=a.id;}));
+    root.querySelectorAll("[data-edit-banner]").forEach(b=>b.addEventListener("click",()=>{const a=data.find(x=>x.id===b.dataset.editBanner);$("bannerTitle").value=a.title;$("bannerMessage").value=a.message;$("bannerImage").value=a.image_url||"";$("bannerImageFile").value="";$("bannerRedirectUrl").value=a.redirect_url||"";previewBannerImage(a.image_url||"");$("bannerActive").checked=a.active;$("bannerForm").dataset.editId=a.id;}));
     root.querySelectorAll("[data-delete-banner]").forEach(b=>b.addEventListener("click",async()=>{if(!confirm("Delete this banner?"))return;const {error:e2}=await client.from("announcements").delete().eq("id",b.dataset.deleteBanner);if(e2){sayBanner(e2.message);return;}await loadBanners();}));
   }
 
@@ -274,7 +292,7 @@
         if(uploadError)throw uploadError;
         imageUrl=client.storage.from("ideas-public-media").getPublicUrl(objectPath).data.publicUrl;
       }
-      const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:imageUrl,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
+      const redirectUrl=$("bannerRedirectUrl").value.trim()||null;if(redirectUrl){const parsed=new URL(redirectUrl);if(parsed.protocol!=="https:"||!/(^|\\.)instagram\\.com$/i.test(parsed.hostname))throw new Error("Enter a valid Instagram page URL beginning with https://www.instagram.com/");}const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:imageUrl,redirect_url:redirectUrl,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
       const id=$("bannerForm").dataset.editId;
       const result=id?await client.from("announcements").update(payload).eq("id",id):await client.from("announcements").insert(payload);
       if(result.error)throw result.error;
