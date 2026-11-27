@@ -145,3 +145,12 @@ button,input{font:inherit}.topbar{height:66px;padding:0 max(20px,calc((100% - 90
 .slip-detail-preview{height:min(52vh,420px);margin:16px 0}
 .slip-detail-buy{width:100%;padding:13px;font-size:13px}
 .home-search{margin:18px 0 8px}
+
+.notifications-button{position:relative}
+.notification-count{position:absolute;right:-5px;top:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:#00e676;color:#0d0d0d;font-size:10px;font-weight:900;display:grid;place-items:center}
+.notification-count[hidden]{display:none}
+.notifications-modal{max-height:78vh}
+.notification-item{display:flex;width:100%;flex-direction:column;gap:5px;text-align:left;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;margin:5px 0}
+.notification-item.unread{border-color:#00e676}
+.notification-item small{color:var(--muted);font-size:11px}
+.banner-clickable{cursor:pointer}
