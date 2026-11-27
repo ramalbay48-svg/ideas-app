@@ -237,7 +237,7 @@ function showPage(page, skipTipsterListLoad = false) {
     panel.className = "section";
     $(".page").insertBefore(panel, $(".notice"));
   }
-  panel.hidden = page === "home";
+  panel.hidden = page === "home" || page === "betslips";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("selected", b.dataset.view === page));
   if (page === "betslips") loadMarketplace();
   if (page === "tipsters" && !skipTipsterListLoad) loadTipstersPage(panel);
@@ -423,7 +423,7 @@ async function getApprovedTipsters() {
 function tipsterCard(t) {
   const name=t.profiles?.display_name||t.username||"Tipster";
   const avatar=t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':'<span>'+escapeHtml(name.charAt(0).toUpperCase())+'</span>';
-  return '<article class="tipster"><button type="button" class="tipster-card-open" data-open-tipster="'+escapeHtml(t.id)+'" aria-label="Open '+escapeHtml(name)+' profile"><div class="tipster-card-photo">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>Accuracy · Admin verified</small></button><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
+  return '<article class="tipster"><button type="button" class="tipster-card-open" data-open-tipster="'+escapeHtml(t.id)+'" aria-label="Open '+escapeHtml(name)+' profile"><div class="tipster-card-photo">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>Open profile · View performance</small></button><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
 }
 async function loadHomeTipsters() {
   const term = ($("#homeTipsterSearch")?.value || "").trim().toLowerCase();
