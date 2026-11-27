@@ -369,7 +369,7 @@ async function refreshNotifications() {
   count.textContent=unread>99?"99+":String(unread);count.hidden=unread===0;
   const root=$("#notificationsList");
   if(root&&$("#notificationsModal").open){
-    root.innerHTML=(data||[]).length?(data||[]).map(n=>'<button type="button" class="notification-item '+(n.read_at?'read':'unread')+'" data-notification="'+escapeHtml(n.id)+'" data-slip="'+escapeHtml(n.related_slip_id||'')+'"><strong>'+escapeHtml(n.title)+'</strong><small>'+escapeHtml(n.message)+'</small><small>'+escapeHtml(new Date(n.created_at).toLocaleString())+'</small></button>').join(""):'<p class="muted">No notifications yet. Follow tipsters to hear when they publish new slips.</p>';
+    root.innerHTML=(data||[]).length?(data||[]).map(n=>'<button type="button" class="notification-item '+(n.read_at?'read':'unread')+'" data-notification="'+escapeHtml(n.id)+'" data-slip="'+escapeHtml(n.related_slip_id||'')+'"><strong>'+escapeHtml(n.title)+'</strong><small>'+escapeHtml(n.message)+'</small><small>'+escapeHtml(new Date(n.created_at).toLocaleString())+'</small></button>').join(""):'<p class="muted">No notifications yet. New published tips from any approved tipster will appear here.</p>';
     root.querySelectorAll("[data-notification]").forEach(el=>el.addEventListener("click",async()=>{
       const id=el.dataset.notification,slipId=el.dataset.slip;
       await db.from("customer_notifications").update({read_at:new Date().toISOString()}).eq("id",id);
