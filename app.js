@@ -8,6 +8,7 @@ let currentUser = null;
 let currentProfile = null;
 let activeCompany = "All";
 let selectedSlip = null;
+let notificationsChannel = null;
 
 
 function toast(message) {
@@ -346,6 +347,9 @@ async function afterLogin(user) {
   if (error) console.warn("Profile lookup:", error.message);
   currentProfile = data || null;
   updateAccountControls();
+  await refreshNotifications();
+  if (notificationsChannel) db.removeChannel(notificationsChannel);
+  notificationsChannel = db.channel("customer-notifications-" + user.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"customer_notifications",filter:"recipient_id=eq."+user.id},payload=>{refreshNotifications();toast(payload.new?.title||"You have a new IDEAS APP notification.");}).subscribe();
 }
 function updateAccountControls() {
   $("#loginOpen").textContent = currentUser ? "Log out" : "Log in";
@@ -361,6 +365,31 @@ function updateAccountControls() {
   $("#adminOpen").hidden = true;
 }
 
+async function refreshNotifications() {
+  const button=$("#notificationsOpen"),count=$("#notificationCount");
+  if(!button||!count)return;
+  if(!currentUser||!db){count.hidden=true;return;}
+  const {data,error}=await db.from("customer_notifications").select("id,recipient_id,title,message,related_slip_id,read_at,created_at").order("created_at",{ascending:false}).limit(30);
+  if(error){console.warn("Notifications:",error.message);return;}
+  const unread=(data||[]).filter(n=>!n.read_at).length;
+  count.textContent=unread>99?"99+":String(unread);count.hidden=unread===0;
+  const root=$("#notificationsList");
+  if(root&&$("#notificationsModal").open){
+    root.innerHTML=(data||[]).length?(data||[]).map(n=>'<button type="button" class="notification-item '+(n.read_at?'read':'unread')+'" data-notification="'+escapeHtml(n.id)+'" data-slip="'+escapeHtml(n.related_slip_id||'')+'"><strong>'+escapeHtml(n.title)+'</strong><small>'+escapeHtml(n.message)+'</small><small>'+escapeHtml(new Date(n.created_at).toLocaleString())+'</small></button>').join(""):'<p class="muted">No notifications yet. Follow tipsters to hear when they publish new slips.</p>';
+    root.querySelectorAll("[data-notification]").forEach(el=>el.addEventListener("click",async()=>{
+      const id=el.dataset.notification,slipId=el.dataset.slip;
+      await db.from("customer_notifications").update({read_at:new Date().toISOString()}).eq("id",id);
+      $("#notificationsModal").close();await refreshNotifications();
+      if(slipId){const {data:slip}=await db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,tipsters(username)").eq("id",slipId).maybeSingle();if(slip)openSlipDetail(slip,slip.tipsters?.username||"Tipster");else toast("That betslip is no longer available.");}
+    }));
+  }
+}
+$("#notificationsOpen")?.addEventListener("click",async()=>{
+  if(!currentUser){showAuth("login");return;}
+  $("#notificationsList").textContent="Loading notifications…";
+  $("#notificationsModal").showModal();await refreshNotifications();
+});
+$("#notificationsClose")?.addEventListener("click",()=>$("#notificationsModal").close());
 async function getFollowStats(tipsterIds) {
   const ids = [...new Set((tipsterIds || []).filter(Boolean))];
   const counts = new Map(), followed = new Set();
@@ -719,6 +748,8 @@ function showBannerSlide(index) {
     : "";
   banner.style.backgroundSize = slide.image_url ? "cover" : "";
   banner.style.backgroundPosition = slide.image_url ? "center" : "";
+  banner.dataset.redirectUrl = slide.redirect_url || "";
+  banner.classList.toggle("banner-clickable", !!slide.redirect_url);
   banner.querySelectorAll("[data-banner-dot]").forEach((dot, i) => {
     dot.classList.toggle("active", i === bannerIndex);
     dot.setAttribute("aria-current", i === bannerIndex ? "true" : "false");
@@ -729,15 +760,19 @@ function startBannerCarousel() {
   if (!banner) return;
   clearInterval(bannerTimer);
   bannerTimer = null;
+  if (!banner.dataset.clickReady) {
+    banner.dataset.clickReady = "1";
+    banner.addEventListener("click", event => {
+      const dot = event.target.closest("[data-banner-dot]");
+      if (dot) { showBannerSlide(Number(dot.dataset.bannerDot)); return; }
+      const target = banner.dataset.redirectUrl;
+      if (target) window.open(target, "_blank", "noopener,noreferrer");
+    });
+  }
   if (bannerSlides.length < 2) return;
   bannerTimer = setInterval(() => {
     if (!document.hidden) showBannerSlide(bannerIndex + 1);
   }, 5000);
-  banner.addEventListener("click", event => {
-    const dot = event.target.closest("[data-banner-dot]");
-    if (!dot) return;
-    showBannerSlide(Number(dot.dataset.bannerDot));
-  });
 }
 async function initialize() {
   $("#tipsterOpen").hidden = true;
@@ -763,7 +798,7 @@ async function initialize() {
   await loadMarketplace();
   await loadHomeTipsters();
   const {data:news, error:newsError} = await db.from("announcements")
-    .select("id,title,message,image_url")
+    .select("id,title,message,image_url,redirect_url")
     .eq("active",true)
     .order("created_at",{ascending:false});
   if (newsError) console.warn("Featured banners:", newsError.message);
