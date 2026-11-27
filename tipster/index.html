@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#008f4c">
 <meta name="description" content="IDEAS APP Tipster — apply and manage your approved tipster account"><title>IDEAS APP Tipster</title>
-<link rel="stylesheet" href="tipster.css?v=5"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="tipster.js?v=7"></script>
+<link rel="stylesheet" href="tipster.css?v=5"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="tipster.js?v=8"></script>
 </head>
 <body>
 <header class="topbar"><a class="brand" href="./"><span class="mark">I</span><span>IDEAS <b>APP</b> · TIPSTER</span></a><a class="back-link" href="/">Customer app ↗</a></header>
@@ -28,7 +28,7 @@
 <p class="muted">Your account has been approved. Submit betslip details and an image as a private draft. A draft is not published or visible to customers until the marketplace review process is completed.</p>
 <form id="slipForm"><label for="odds">Total odds</label><input id="odds" type="number" min="1.01" step="0.01" placeholder="e.g. 5.50" required>
 <label for="price">Selling price (TZS)</label><input id="price" type="number" min="1" step="1" placeholder="e.g. 2500" required>
-<label for="company">Betting company</label><select id="company" required><option value="">Choose company</option><option>SportPesa</option><option>Betika</option><option>BetPawa</option><option>Meridianbet</option><option>Other</option></select>
+<label for="company">Betting company name</label><input id="company" type="text" maxlength="60" placeholder="Type the betting company name" autocomplete="organization" required>
 <label for="expiry">Expiry date and time</label><input id="expiry" type="datetime-local" required>
 <label for="image">Betslip picture (JPG, PNG or WebP, max 5 MB)</label><input id="image" type="file" accept="image/jpeg,image/png,image/webp" required>
 <button class="primary" id="uploadButton">Upload private draft</button></form><p class="hint" id="slipStatus"></p><div class="subheading">Your drafts and listings</div><div class="records" id="mySlips">Loading…</div>

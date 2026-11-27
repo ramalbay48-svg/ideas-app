@@ -118,3 +118,39 @@ button,input{font:inherit}.topbar{height:66px;padding:0 max(20px,calc((100% - 90
 :root.dark .tipster-profile-follow{border-color:var(--line);background:var(--panel)}
 :root.dark .notice{background:var(--panel)}
 :root.dark .banner-dot.active{background:#00e676}
+
+/* IDEAS APP refresh: image-led tipster cards and profile, using the existing brand palette */
+.tipster-row{display:flex;gap:12px;overflow-x:auto;padding:2px 1px 10px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.tipster-row::-webkit-scrollbar{display:none}
+.tipster{flex:0 0 46%;max-width:210px;scroll-snap-align:start;padding:9px;border-radius:16px;text-align:left}
+.tipster-card-open{display:block;width:100%;padding:0;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
+.tipster-card-photo{height:118px;overflow:hidden;border-radius:12px;margin-bottom:9px;background:linear-gradient(145deg,#163d29,#0d0d0d);display:grid;place-items:center;color:#00e676;font-size:32px;font-weight:900}
+.tipster-card-photo img{width:100%;height:100%;object-fit:cover}
+.tipster-card-open strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tipster-card-open small{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.tipster .follow-button,.tipster .tipster-view-button{width:100%;margin-top:8px}
+.tipster-profile-hero{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:0 14px 14px;text-align:center}
+.tipster-profile-cover{height:190px;margin:0 -14px 12px;background:linear-gradient(145deg,#143b27,#0d0d0d);display:grid;place-items:center;overflow:hidden}
+.tipster-profile-cover img{width:100%;height:100%;object-fit:cover}
+.tipster-profile-cover span{font-size:64px;color:#00e676;font-weight:900}
+.tipster-profile-hero h2{margin:5px 0;font-size:21px}
+.tipster-profile-bio{color:var(--muted);font-size:12px;margin:10px 0 0}
+.tipster-accuracy{font-size:11px;color:var(--green);font-weight:750;margin:8px 0}
+.tipster-results{gap:8px;flex-wrap:nowrap;overflow-x:auto;padding:5px 2px}
+.tipster-result-row{flex:0 0 18px}
+
+/* Betslip detail page */
+.slip-detail-card{margin-top:14px;padding:15px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+.slip-detail-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.slip-detail-preview{height:min(52vh,420px);margin:16px 0}
+.slip-detail-buy{width:100%;padding:13px;font-size:13px}
+.home-search{margin:18px 0 8px}
+
+.notifications-button{position:relative}
+.notification-count{position:absolute;right:-5px;top:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:#00e676;color:#0d0d0d;font-size:10px;font-weight:900;display:grid;place-items:center}
+.notification-count[hidden]{display:none}
+.notifications-modal{max-height:78vh}
+.notification-item{display:flex;width:100%;flex-direction:column;gap:5px;text-align:left;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;margin:5px 0}
+.notification-item.unread{border-color:#00e676}
+.notification-item small{color:var(--muted);font-size:11px}
+.banner-clickable{cursor:pointer}

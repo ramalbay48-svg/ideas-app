@@ -8,6 +8,7 @@ let currentUser = null;
 let currentProfile = null;
 let activeCompany = "All";
 let selectedSlip = null;
+let notificationsChannel = null;
 
 
 function toast(message) {
@@ -237,8 +238,9 @@ function showPage(page, skipTipsterListLoad = false) {
     panel.className = "section";
     $(".page").insertBefore(panel, $(".notice"));
   }
-  panel.hidden = page === "home";
+  panel.hidden = page === "home" || page === "betslips";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("selected", b.dataset.view === page));
+  if (page === "betslips") loadMarketplace();
   if (page === "tipsters" && !skipTipsterListLoad) loadTipstersPage(panel);
   if (page === "following") loadFollowingPage(panel);
   if (page === "profile") loadProfilePage(panel);
@@ -345,6 +347,9 @@ async function afterLogin(user) {
   if (error) console.warn("Profile lookup:", error.message);
   currentProfile = data || null;
   updateAccountControls();
+  await refreshNotifications();
+  if (notificationsChannel) db.removeChannel(notificationsChannel);
+  notificationsChannel = db.channel("customer-notifications-" + user.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"customer_notifications",filter:"recipient_id=eq."+user.id},payload=>{refreshNotifications();toast(payload.new?.title||"You have a new IDEAS APP notification.");}).subscribe();
 }
 function updateAccountControls() {
   $("#loginOpen").textContent = currentUser ? "Log out" : "Log in";
@@ -360,6 +365,31 @@ function updateAccountControls() {
   $("#adminOpen").hidden = true;
 }
 
+async function refreshNotifications() {
+  const button=$("#notificationsOpen"),count=$("#notificationCount");
+  if(!button||!count)return;
+  if(!currentUser||!db){count.hidden=true;return;}
+  const {data,error}=await db.from("customer_notifications").select("id,recipient_id,title,message,related_slip_id,read_at,created_at").order("created_at",{ascending:false}).limit(30);
+  if(error){console.warn("Notifications:",error.message);return;}
+  const unread=(data||[]).filter(n=>!n.read_at).length;
+  count.textContent=unread>99?"99+":String(unread);count.hidden=unread===0;
+  const root=$("#notificationsList");
+  if(root&&$("#notificationsModal").open){
+    root.innerHTML=(data||[]).length?(data||[]).map(n=>'<button type="button" class="notification-item '+(n.read_at?'read':'unread')+'" data-notification="'+escapeHtml(n.id)+'" data-slip="'+escapeHtml(n.related_slip_id||'')+'"><strong>'+escapeHtml(n.title)+'</strong><small>'+escapeHtml(n.message)+'</small><small>'+escapeHtml(new Date(n.created_at).toLocaleString())+'</small></button>').join(""):'<p class="muted">No notifications yet. Follow tipsters to hear when they publish new slips.</p>';
+    root.querySelectorAll("[data-notification]").forEach(el=>el.addEventListener("click",async()=>{
+      const id=el.dataset.notification,slipId=el.dataset.slip;
+      await db.from("customer_notifications").update({read_at:new Date().toISOString()}).eq("id",id);
+      $("#notificationsModal").close();await refreshNotifications();
+      if(slipId){const {data:slip}=await db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at,tipsters(username)").eq("id",slipId).maybeSingle();if(slip)openSlipDetail(slip,slip.tipsters?.username||"Tipster");else toast("That betslip is no longer available.");}
+    }));
+  }
+}
+$("#notificationsOpen")?.addEventListener("click",async()=>{
+  if(!currentUser){showAuth("login");return;}
+  $("#notificationsList").textContent="Loading notifications…";
+  $("#notificationsModal").showModal();await refreshNotifications();
+});
+$("#notificationsClose")?.addEventListener("click",()=>$("#notificationsModal").close());
 async function getFollowStats(tipsterIds) {
   const ids = [...new Set((tipsterIds || []).filter(Boolean))];
   const counts = new Map(), followed = new Set();
@@ -421,19 +451,21 @@ async function getApprovedTipsters() {
 }
 function tipsterCard(t) {
   const name=t.profiles?.display_name||t.username||"Tipster";
-  const avatar=t.profiles?.avatar_path?'<img alt="" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':escapeHtml(name.charAt(0).toUpperCase());
-  return '<article class="tipster"><div class="tipster-avatar">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>@'+escapeHtml(t.username)+'</small><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
+  const avatar=t.profiles?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(t.profiles.avatar_path))+'">':'<span>'+escapeHtml(name.charAt(0).toUpperCase())+'</span>';
+  return '<article class="tipster"><button type="button" class="tipster-card-open" data-open-tipster="'+escapeHtml(t.id)+'" aria-label="Open '+escapeHtml(name)+' profile"><div class="tipster-card-photo">'+avatar+'</div><strong>'+escapeHtml(name)+' <span class="verified-mark">✓</span></strong><small>Open profile · View performance</small></button><small class="follower-count">'+Number(t.followers_count||0).toLocaleString()+' followers</small>'+followButton(t.id,t.is_following)+'<button type="button" class="tipster-view-button" data-open-tipster="'+escapeHtml(t.id)+'">View profile</button></article>';
 }
 async function loadHomeTipsters() {
-  const rows=await getApprovedTipsters();
+  const term = ($("#homeTipsterSearch")?.value || "").trim().toLowerCase();
+  const allRows=await getApprovedTipsters();
+  const rows=allRows.filter(t => (t.profiles?.display_name||t.username||"").toLowerCase().includes(term) || (t.username||"").toLowerCase().includes(term));
   const root=$("#tipsters"), suggestions=$("#followSuggestions");
   if (!root || !suggestions) return;
   if (!rows.length) {root.innerHTML='<div class="empty">Approved tipsters will appear here.</div>';suggestions.innerHTML='<div class="empty">New tipsters will appear here.</div>';return;}
   root.innerHTML=rows.slice(0,6).map(tipsterCard).join("");
   suggestions.innerHTML=rows.filter(t=>!t.is_following).slice(0,6).map(tipsterCard).join("") || '<div class="empty">You are following all currently listed tipsters.</div>';
   [root,suggestions].forEach(wireFollowButtons);
-
 }
+$("#homeTipsterSearch")?.addEventListener("input", loadHomeTipsters);
 async function loadFollowingPage(panel) {
   panel.innerHTML='<p class="eyebrow">YOUR PICKS</p><h2>Following</h2><p class="muted">Tipsters you follow.</p><div class="tipster-row" id="followingList"><div class="empty">Loading…</div></div>';
   if (!currentUser) {
@@ -461,21 +493,35 @@ async function loadTipstersPage(panel) {
 async function loadTipsterDetail(panel, tipster) {
   if (!tipster) return;
   const displayName = tipster.profiles?.display_name || tipster.username || "Tipster";
-  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><p class="eyebrow">TIPSTER PROFILE</p><h2>' + escapeHtml(displayName) + '</h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-profile-follow"><strong>' + Number(tipster.followers_count||0).toLocaleString() + ' followers</strong>' + followButton(tipster.id,tipster.is_following) + '</div><div class="tipster-results-wrap"><strong class="tipster-results-title">Recent results</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div></div><p>' + escapeHtml(tipster.bio || "No profile description yet.") + '</p><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
+  const avatar = tipster.profiles?.avatar_path ? '<img alt="Profile picture of '+escapeHtml(displayName)+'" src="'+escapeHtml(publicAvatar(tipster.profiles.avatar_path))+'">' : '<span>'+escapeHtml(displayName.charAt(0).toUpperCase())+'</span>';
+  panel.innerHTML = '<button class="secondary-action" id="backToTipsters">← Back to tipsters</button><section class="tipster-profile-hero"><div class="tipster-profile-cover">'+avatar+'</div><h2>' + escapeHtml(displayName) + ' <span class="verified-mark">✓</span></h2><p class="muted">@' + escapeHtml(tipster.username) + '</p><div class="tipster-profile-follow"><strong>' + Number(tipster.followers_count||0).toLocaleString() + ' followers</strong>' + followButton(tipster.id,tipster.is_following) + '</div><p class="tipster-profile-bio">' + escapeHtml(tipster.bio || "No profile description yet.") + '</p></section><div class="tipster-results-wrap"><strong class="tipster-results-title">Last 10 consecutive verified slips</strong><div id="tipsterVerifiedResults" class="tipster-results"><div class="empty">Loading results…</div></div><p id="tipsterAccuracy" class="tipster-accuracy">Calculating performance…</p></div><h3>Published betting slips</h3><p class="muted">Loading available slips…</p>';
   $("#backToTipsters").addEventListener("click", () => loadTipstersPage(panel));
   wireFollowButtons(panel);
   const {data: verifiedRows, error: verifiedError} = await db.from("public_verified_results")
     .select("id,slip_id,tipster_id,username,submitted_result,total_odds,betting_company,reviewed_at")
-    .eq("tipster_id", tipster.id).order("reviewed_at", {ascending:false}).limit(30);
+    .eq("tipster_id", tipster.id).order("reviewed_at", {ascending:false}).limit(40);
   const verifiedRoot = $("#tipsterVerifiedResults");
   if (verifiedRoot) {
     if (verifiedError) {
       console.warn("Tipster verified results:", verifiedError.message);
       verifiedRoot.innerHTML = '<div class="empty">Verified results are temporarily unavailable.</div>';
-    } else if (!verifiedRows?.length) {
-      verifiedRoot.innerHTML = '<div class="empty">No administrator-verified results yet.</div>';
+      $("#tipsterAccuracy").textContent = "Performance unavailable";
     } else {
-      verifiedRoot.innerHTML = verifiedRows.slice(0,6).map(result => verifiedResultRow(result)).join("");
+      const seen = new Set();
+      const lastTen = (verifiedRows || []).filter(row => {
+        if (!row.slip_id || seen.has(row.slip_id)) return false;
+        seen.add(row.slip_id);
+        return true;
+      }).slice(0,10);
+      if (!lastTen.length) {
+        verifiedRoot.innerHTML = '<div class="empty">No administrator-verified results yet.</div>';
+        $("#tipsterAccuracy").textContent = "No verified performance yet";
+      } else {
+        const wins = lastTen.filter(row => row.submitted_result === "won").length;
+        const accuracy = Math.round((wins / lastTen.length) * 100);
+        verifiedRoot.innerHTML = lastTen.map(result => verifiedResultRow(result)).join("");
+        $("#tipsterAccuracy").textContent = accuracy + "% accuracy · " + wins + " wins from " + lastTen.length + " consecutive slips";
+      }
     }
   }
   const {data, error} = await db.from("betslips").select("id,total_odds,price_tzs,betting_company,expires_at").eq("tipster_id", tipster.id).eq("status", "published").gt("expires_at", new Date().toISOString()).order("created_at", {ascending:false});
@@ -489,12 +535,11 @@ async function loadTipsterDetail(panel, tipster) {
     panel.innerHTML = panel.innerHTML.replace('<h3>Published betting slips</h3><p class="muted">Loading available slips…</p>', heading + '<div class="empty">This tipster has no active published slips right now.</div>');
     return;
   }
-  const cards = data.map(s => '<article class="slip-card"><div class="slip-top"><strong>' + escapeHtml(s.betting_company || "Betting company") + '</strong><span class="company">Published</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>' + escapeHtml(s.total_odds) + '</strong></div><div class="stat"><small>Valid until</small><strong>' + escapeHtml(new Date(s.expires_at).toLocaleString()) + '</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="' + escapeHtml(s.expires_at) + '">Calculating…</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">' + money(s.price_tzs) + '<small>One-time purchase</small></div><button class="buy-button" data-buy="' + escapeHtml(s.id) + '">Buy slip</button></div></article>').join("");
+  const cards = data.map(s => '<article class="slip-card"><div class="slip-top"><strong>' + escapeHtml(s.betting_company || "Betting company") + '</strong><span class="company">Published</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>' + escapeHtml(s.total_odds) + '</strong></div><div class="stat"><small>Valid until</small><strong>' + escapeHtml(new Date(s.expires_at).toLocaleString()) + '</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="' + escapeHtml(s.expires_at) + '">Calculating…</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">' + money(s.price_tzs) + '<small>One-time purchase</small></div><button class="buy-button" data-view-slip="' + escapeHtml(s.id) + '">View Bet Slip</button></div></article>').join("");
   panel.innerHTML = panel.innerHTML.replace('<h3>Published betting slips</h3><p class="muted">Loading available slips…</p>', heading + cards);
-  panel.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", () => {
-    if (!currentUser) return showAuth("login");
-    const slip = data.find(item => item.id === button.dataset.buy);
-    if (slip) openCheckout(slip, tipster.username || "Tipster");
+  panel.querySelectorAll("[data-view-slip]").forEach(button => button.addEventListener("click", () => {
+    const slip = data.find(item => item.id === button.dataset.viewSlip);
+    if (slip) openSlipDetail(slip, tipster.username || "Tipster");
   }));
 }
 
@@ -503,6 +548,15 @@ function verifiedResultRow(result) {
   return '<div class="tipster-result-row '+(won ? "won" : "lost")+'" aria-label="'+(won ? "Won" : "Lost")+'"><span class="tipster-result-dot" aria-hidden="true"></span></div>';
 }
 
+function openSlipDetail(slip, tipsterName = "Tipster") {
+  if (!slip?.id) return;
+  const panel = $("#appPagePanel");
+  if (!panel) return;
+  showPage("slip-detail", true);
+  panel.innerHTML = '<button type="button" class="secondary-action" id="backToBetslips">← Back to betslips</button><p class="eyebrow">BETSLIP DETAILS</p><h2>'+escapeHtml(tipsterName)+'</h2><article class="slip-detail-card"><div class="slip-detail-meta"><span class="company">'+escapeHtml(slip.betting_company||"Betting company")+'</span><span class="company">Private until purchased</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(slip.total_odds)+'</strong></div><div class="stat"><small>Price</small><strong>'+money(slip.price_tzs)+'</strong></div><div class="stat"><small>Validity</small><strong data-slip-countdown data-expires-at="'+escapeHtml(slip.expires_at)+'">Calculating…</strong></div></div><div class="locked-preview slip-detail-preview">▣ BETSLIP IMAGE LOCKED</div><p class="muted">The full betslip image is revealed only after SplashPay confirms your payment.</p><button type="button" class="buy-button slip-detail-buy" id="detailBuySlip">Buy Bet Slip · '+money(slip.price_tzs)+'</button></article>';
+  $("#backToBetslips").onclick=()=>showPage("betslips");
+  $("#detailBuySlip").onclick=()=>openCheckout(slip,tipsterName);
+}
 async function loadMarketplace() {
   const root = $("#slips");
   if (!root || !db) return;
@@ -524,12 +578,11 @@ async function loadMarketplace() {
     const profile = profiles.get(s.tipsters?.user_id);
     const name = profile?.display_name || s.tipsters?.username || "Tipster";
     const username = s.tipsters?.username || "";
-    return '<article class="slip-card"><div class="slip-top"><button type="button" class="seller tipster-profile-link" data-open-tipster="'+escapeHtml(s.tipsters?.id)+'"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></button><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="'+escapeHtml(s.expires_at)+'">Calculating…</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-buy="'+s.id+'">Buy slip</button></div></article>';
+    return '<article class="slip-card"><div class="slip-top"><button type="button" class="seller tipster-profile-link" data-open-tipster="'+escapeHtml(s.tipsters?.id)+'"><div class="seller-avatar">'+(profile?.avatar_path?'<img alt="Profile picture of '+escapeHtml(name)+'" src="'+escapeHtml(publicAvatar(profile.avatar_path))+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':escapeHtml(name.charAt(0).toUpperCase()))+'</div><div><strong>'+escapeHtml(name)+'</strong><small>@'+escapeHtml(username)+'</small></div></button><span class="company">'+escapeHtml(s.betting_company)+'</span></div><div class="slip-stats"><div class="stat"><small>Total odds</small><strong>'+escapeHtml(s.total_odds)+'</strong></div><div class="stat"><small>Validity</small><strong>'+new Date(s.expires_at).toLocaleString()+'</strong></div><div class="stat"><small>Time remaining</small><strong data-slip-countdown data-expires-at="'+escapeHtml(s.expires_at)+'">Calculating…</strong></div><div class="stat"><small>Slip image</small><strong>Covered</strong></div></div><div class="locked-preview">▣ BETSLIP HIDDEN UNTIL PAYMENT</div><div class="slip-footer"><div class="price">'+money(s.price_tzs)+'<small>One-time purchase</small></div><button class="buy-button" data-view-slip="'+s.id+'">View Bet Slip</button></div></article>';
   }).join("");
-  root.querySelectorAll("[data-buy]").forEach(b => b.addEventListener("click", () => {
-    if (!currentUser) return showAuth("login");
-    const slip = rows.find(item => item.id === b.dataset.buy);
-    if (slip) openCheckout(slip, slip.tipsters?.username || "Tipster");
+  root.querySelectorAll("[data-view-slip]").forEach(b => b.addEventListener("click", () => {
+    const slip = rows.find(item => item.id === b.dataset.viewSlip);
+    if (slip) openSlipDetail(slip, slip.tipsters?.username || "Tipster");
   }));
 }
 async function loadPurchasesPage(panel) {
@@ -695,6 +748,8 @@ function showBannerSlide(index) {
     : "";
   banner.style.backgroundSize = slide.image_url ? "cover" : "";
   banner.style.backgroundPosition = slide.image_url ? "center" : "";
+  banner.dataset.redirectUrl = slide.redirect_url || "";
+  banner.classList.toggle("banner-clickable", !!slide.redirect_url);
   banner.querySelectorAll("[data-banner-dot]").forEach((dot, i) => {
     dot.classList.toggle("active", i === bannerIndex);
     dot.setAttribute("aria-current", i === bannerIndex ? "true" : "false");
@@ -705,15 +760,19 @@ function startBannerCarousel() {
   if (!banner) return;
   clearInterval(bannerTimer);
   bannerTimer = null;
+  if (!banner.dataset.clickReady) {
+    banner.dataset.clickReady = "1";
+    banner.addEventListener("click", event => {
+      const dot = event.target.closest("[data-banner-dot]");
+      if (dot) { showBannerSlide(Number(dot.dataset.bannerDot)); return; }
+      const target = banner.dataset.redirectUrl;
+      if (target) window.open(target, "_blank", "noopener,noreferrer");
+    });
+  }
   if (bannerSlides.length < 2) return;
   bannerTimer = setInterval(() => {
     if (!document.hidden) showBannerSlide(bannerIndex + 1);
   }, 5000);
-  banner.addEventListener("click", event => {
-    const dot = event.target.closest("[data-banner-dot]");
-    if (!dot) return;
-    showBannerSlide(Number(dot.dataset.bannerDot));
-  });
 }
 async function initialize() {
   $("#tipsterOpen").hidden = true;
@@ -739,7 +798,7 @@ async function initialize() {
   await loadMarketplace();
   await loadHomeTipsters();
   const {data:news, error:newsError} = await db.from("announcements")
-    .select("id,title,message,image_url")
+    .select("id,title,message,image_url,redirect_url")
     .eq("active",true)
     .order("created_at",{ascending:false});
   if (newsError) console.warn("Featured banners:", newsError.message);
