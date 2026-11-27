@@ -292,7 +292,7 @@
         if(uploadError)throw uploadError;
         imageUrl=client.storage.from("ideas-public-media").getPublicUrl(objectPath).data.publicUrl;
       }
-      const redirectUrl=$("bannerRedirectUrl").value.trim()||null;if(redirectUrl){const parsed=new URL(redirectUrl);if(parsed.protocol!=="https:"||!/(^|\\.)instagram\\.com$/i.test(parsed.hostname))throw new Error("Enter a valid Instagram page URL beginning with https://www.instagram.com/");}const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:imageUrl,redirect_url:redirectUrl,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
+      const redirectUrl=$("bannerRedirectUrl").value.trim()||null;if(redirectUrl){const parsed=new URL(redirectUrl);if(parsed.protocol!=="https:"||!/(^|\.)instagram\.com$/i.test(parsed.hostname))throw new Error("Enter a valid Instagram page URL beginning with https://www.instagram.com/");}const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:imageUrl,redirect_url:redirectUrl,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
       const id=$("bannerForm").dataset.editId;
       const result=id?await client.from("announcements").update(payload).eq("id",id):await client.from("announcements").insert(payload);
       if(result.error)throw result.error;
