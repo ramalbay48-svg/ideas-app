@@ -298,7 +298,7 @@
         imageUrl=client.storage.from("ideas-public-media").getPublicUrl(objectPath).data.publicUrl;
       }
       const redirectUrl=$("bannerRedirectUrl").value.trim()||null;
-      if(redirectUrl){const parsed=new URL(redirectUrl);if(!["https:","http:"].includes(parsed.protocol)||!parsed.hostname)throw new Error("Enter a valid website or app link beginning with https:// or http://");}
+      if(redirectUrl){const parsed=new window.URL(redirectUrl);if(!["https:","http:"].includes(parsed.protocol)||!parsed.hostname)throw new Error("Enter a valid website or app link beginning with https:// or http://");}
       const payload={title:$("bannerTitle").value.trim(),message:$("bannerMessage").value.trim(),image_url:imageUrl,redirect_url:redirectUrl,active:$("bannerActive").checked,created_by:user.id,updated_at:new Date().toISOString()};
       const id=$("bannerForm").dataset.editId;
       const result=id?await client.from("announcements").update(payload).eq("id",id):await client.from("announcements").insert(payload);
